@@ -4,74 +4,79 @@
     ViewBag.Title = "Album - " + Model.Album.Title;
 }
 
-<h2>@Model.Album.Title</h2>
+<article class="album-detail">
+    <div class="album-detail-art">
+        <img alt="@Model.Album.Title" src="@Url.Content(Model.Album.AlbumArtUrl)" />
+    </div>
+    <div class="album-detail-content">
+        <p class="detail-kicker">@Model.Album.Genre!.Name</p>
+        <h1>@Model.Album.Title</h1>
+        <p class="detail-artist">
+            by @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
+        </p>
+        <p class="detail-price">@Model.Album.Price.ToString("C")</p>
+        <div class="detail-actions">
+            <a class="btn btn-primary btn-lg" href="@Url.Action("AddToCart", "ShoppingCart", new { id = Model.Album.AlbumId })">
+                <span class="glyphicon glyphicon-shopping-cart"></span>
+                Add to cart
+            </a>
+            <a class="btn btn-default btn-lg" href="@Url.Action("Browse", "Store", new { genre = Model.Album.Genre.Name })">
+                Back to @Model.Album.Genre.Name
+            </a>
+        </div>
+    </div>
+</article>
 
-<p>
-    <img alt="@Model.Album.Title" src="@Url.Content(@Model.Album.AlbumArtUrl)" />
-</p>
-
-<div id="album-details">
-    <p>
-        <em>Genre:</em>
-        @Model.Album.Genre!.Name
-    </p>
-    <p>
-        <em>Artist:</em>
-        @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
-    </p>
-    <p>
-        <em>Price:</em>
-        @Html.DisplayFor(model => model.Album.Price)
-    </p>
-    <p class="btn btn-default">
-        <span class="glyphicon glyphicon-shopping-cart"></span>
-        @Html.ActionLink("Add to cart", "AddToCart",
-            "ShoppingCart", new { id = Model.Album.AlbumId }, "")
-    </p>
-</div>
-
-<section class="recommendations-section">
-    <h3>Related in @Model.Album.Genre!.Name</h3>
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Related in @Model.Album.Genre!.Name</h2>
+    </div>
     @if (Model.RelatedByGenre.Count == 0)
     {
-        <p class="text-muted">No related albums available yet.</p>
+        <p class="section-subtitle">No related albums available yet.</p>
     }
     else
     {
-        <ul class="list-unstyled row recommendation-grid">
-            @foreach (var album in Model.RelatedByGenre)
-            {
-                <li class="col-md-3 col-sm-4 col-xs-6 container">
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
-                        <h5>@album.Title</h5>
-                    </a>
-                    <small class="text-muted">@album.Artist?.Name</small>
-                </li>
-            }
-        </ul>
+        <div class="album-grid">
+        @foreach (var album in Model.RelatedByGenre)
+        {
+            <article class="album-card">
+                <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <div class="album-card-body">
+                        <h3 class="album-title">@album.Title</h3>
+                        <p class="album-price">@album.Artist?.Name</p>
+                    </div>
+                </a>
+            </article>
+        }
+        </div>
     }
 </section>
 
-<section class="recommendations-section">
-    <h3>More from @Model.Album.Artist!.Name</h3>
+<section class="content-section">
+    <div class="section-heading">
+        <h2>More from @Model.Album.Artist!.Name</h2>
+    </div>
     @if (Model.MoreFromArtist.Count == 0)
     {
-        <p class="text-muted">No additional albums from this artist yet.</p>
+        <p class="section-subtitle">No additional albums from this artist yet.</p>
     }
     else
     {
-        <ul class="list-unstyled row recommendation-grid">
-            @foreach (var album in Model.MoreFromArtist)
-            {
-                <li class="col-md-3 col-sm-4 col-xs-6 container">
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
-                        <h5>@album.Title</h5>
-                    </a>
-                    <small class="text-muted">@album.Genre?.Name</small>
-                </li>
-            }
-        </ul>
+        <div class="album-grid">
+        @foreach (var album in Model.MoreFromArtist)
+        {
+            <article class="album-card">
+                <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <div class="album-card-body">
+                        <h3 class="album-title">@album.Title</h3>
+                        <p class="album-price">@album.Genre?.Name</p>
+                    </div>
+                </a>
+            </article>
+        }
+        </div>
     }
 </section>

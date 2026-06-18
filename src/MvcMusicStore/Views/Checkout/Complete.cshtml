@@ -6,8 +6,13 @@
 
 <h2>Checkout Complete</h2>
 
-<p>Thanks for your order! Your order number is: @Model</p>
+<div class="alert alert-success">
+    Thanks for your order! Your confirmation number is <strong>@Model</strong>.
+</div>
 
-<p>How about shopping for some more music in our 
-    @Html.ActionLink("Store", "Index", "Home")
+<p>Your order has been placed and your cart has been cleared.</p>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Continue shopping</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
 </p>
