@@ -1,5 +1,5 @@
-﻿using System.Linq;
-using System.Web.Mvc;
+using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
 using MvcMusicStore.ViewModels;
 
@@ -7,14 +7,19 @@ namespace MvcMusicStore.Controllers
 {
     public class ShoppingCartController : Controller
     {
-        MusicStoreEntities storeDB = new MusicStoreEntities();
+        private readonly MusicStoreEntities storeDB;
+
+        public ShoppingCartController(MusicStoreEntities storeDb)
+        {
+            storeDB = storeDb;
+        }
 
         //
         // GET: /ShoppingCart/
 
-        public ActionResult Index()
+        public IActionResult Index()
         {
-            var cart = ShoppingCart.GetCart(storeDB, this.HttpContext);
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
             // Set up our ViewModel
             var viewModel = new ShoppingCartViewModel
@@ -30,7 +35,7 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /ShoppingCart/AddToCart/5
 
-        public ActionResult AddToCart(int id)
+        public IActionResult AddToCart(int id)
         {
 
             // Retrieve the album from the database
@@ -38,7 +43,7 @@ namespace MvcMusicStore.Controllers
                 .Single(album => album.AlbumId == id);
 
             // Add it to the shopping cart
-            var cart = ShoppingCart.GetCart(storeDB, this.HttpContext);
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
             cart.AddToCart(addedAlbum);
 
@@ -52,14 +57,14 @@ namespace MvcMusicStore.Controllers
         // AJAX: /ShoppingCart/RemoveFromCart/5
 
         [HttpPost]
-        public ActionResult RemoveFromCart(int id)
+        public IActionResult RemoveFromCart(int id)
         {
             // Retrieve the current user's shopping cart
-            var cart = ShoppingCart.GetCart(storeDB, this.HttpContext);
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
             // Get the name of the album to display confirmation
             string albumName = storeDB.Carts
-                .Single(item => item.RecordId == id).Album.Title;
+                .Single(item => item.RecordId == id).Album!.Title!;
 
             // Remove from cart
             int itemCount = cart.RemoveFromCart(id);
@@ -81,21 +86,6 @@ namespace MvcMusicStore.Controllers
             };
 
             return Json(results);
-        }
-
-        [ChildActionOnly]
-        public ActionResult CartSummary()
-        {
-            var cart = ShoppingCart.GetCart(storeDB, this.HttpContext);
-
-            var cartItems = cart.GetCartItems()
-                .Select(a => a.Album.Title)
-                .OrderBy(x => x);
-
-            ViewBag.CartCount = cartItems.Count();
-            ViewBag.CartSummary = string.Join("\n", cartItems.Distinct());
-
-            return PartialView("CartSummary");
         }
     }
 }

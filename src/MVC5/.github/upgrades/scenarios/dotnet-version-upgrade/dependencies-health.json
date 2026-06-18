@@ -1,0 +1,9 @@
+{
+  "packageGovernance": {
+    "totalDistinctPackages": 0,
+    "totalVersionDriftInstances": 0,
+    "targetFramework": "net10.0",
+    "packages": []
+  },
+  "projects": []
+}

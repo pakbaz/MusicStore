@@ -1,14 +1,11 @@
 ﻿@model IEnumerable<MvcMusicStore.Models.Album>
 
-@helper Truncate(string input, int length)
-{
-    if (input.Length <= length)
+@functions {
+    string Truncate(string? input, int length)
     {
-        @input
-    }
-    else
-    {
-        @input.Substring(0, length)<text>...</text>
+        if (input == null || input.Length <= length)
+            return input ?? string.Empty;
+        return input.Substring(0, length) + "...";
     }
 }
 

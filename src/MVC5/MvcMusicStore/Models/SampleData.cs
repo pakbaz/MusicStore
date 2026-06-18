@@ -1,22 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using System.Data.Entity;
+using Microsoft.EntityFrameworkCore;
 
 namespace MvcMusicStore.Models
 {
-    public class SampleData : DropCreateDatabaseIfModelChanges<MusicStoreEntities>
+    public class SampleData
     {
-        protected override void Seed(MusicStoreEntities context)
+        public static async Task SeedAsync(MusicStoreEntities context)
         {
+            // Only seed if no data exists
+            if (await context.Genres.AnyAsync())
+                return;
+
             const string imgUrl = "~/Images/placeholder.png";
 
             var genres = AddGenres(context);
             var artists = AddArtists(context);
             AddAlbums(context, imgUrl, genres, artists);
 
-            context.SaveChanges();
+            await context.SaveChangesAsync();
         }
 
         private static void AddAlbums(MusicStoreEntities context, string imgUrl, List<Genre> genres, List<Artist> artists)

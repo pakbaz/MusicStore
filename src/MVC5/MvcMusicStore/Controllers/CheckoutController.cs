@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Linq;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
 
 namespace MvcMusicStore.Controllers
@@ -8,13 +9,18 @@ namespace MvcMusicStore.Controllers
     [Authorize]
     public class CheckoutController : Controller
     {
-        MusicStoreEntities storeDB = new MusicStoreEntities();
+        private readonly MusicStoreEntities storeDB;
         const string PromoCode = "FREE";
+
+        public CheckoutController(MusicStoreEntities storeDb)
+        {
+            storeDB = storeDb;
+        }
 
         //
         // GET: /Checkout/
 
-        public ActionResult AddressAndPayment()
+        public IActionResult AddressAndPayment()
         {
             return View();
         }
@@ -23,37 +29,35 @@ namespace MvcMusicStore.Controllers
         // POST: /Checkout/AddressAndPayment
 
         [HttpPost]
-        public ActionResult AddressAndPayment(FormCollection values)
+        public IActionResult AddressAndPayment(Order order)
         {
-            var order = new Order();
-            TryUpdateModel(order);
+            if (!ModelState.IsValid)
+                return View(order);
 
             try
             {
-                if (string.Equals(values["PromoCode"], PromoCode,
-                    StringComparison.OrdinalIgnoreCase) == false)
+                // Check promo code from form
+                var promoCode = Request.Form["PromoCode"].ToString();
+                if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
                 {
                     return View(order);
                 }
-                else
-                {
-                    order.Username = User.Identity.Name;
-                    order.OrderDate = DateTime.Now;
 
-                    //Add the Order
-                    storeDB.Orders.Add(order);
+                order.Username = User.Identity!.Name!;
+                order.OrderDate = DateTime.Now;
 
-                    //Process the order
-                    var cart = ShoppingCart.GetCart(storeDB, this.HttpContext);
-                    cart.CreateOrder(order);
+                //Add the Order
+                storeDB.Orders.Add(order);
 
-                    // Save all changes
-                    storeDB.SaveChanges();
+                //Process the order
+                var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+                cart.CreateOrder(order);
 
-                    return RedirectToAction("Complete",
-                        new { id = order.OrderId });
-                }
+                // Save all changes
+                storeDB.SaveChanges();
 
+                return RedirectToAction("Complete",
+                    new { id = order.OrderId });
             }
             catch
             {
@@ -65,12 +69,12 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Checkout/Complete
 
-        public ActionResult Complete(int id)
+        public IActionResult Complete(int id)
         {
             // Validate customer owns this order
             bool isValid = storeDB.Orders.Any(
                 o => o.OrderId == id &&
-                o.Username == User.Identity.Name);
+                o.Username == User.Identity!.Name);
 
             if (isValid)
             {

@@ -1,18 +1,23 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
 
 namespace MvcMusicStore.Controllers
 {
     public class HomeController : Controller
     {
-        private MusicStoreEntities storeDB = new MusicStoreEntities();
+        private readonly MusicStoreEntities storeDB;
+
+        public HomeController(MusicStoreEntities storeDb)
+        {
+            storeDB = storeDb;
+        }
+
         //
         // GET: /Home/
 
-        public ActionResult Index()
+        public IActionResult Index()
         {
             // Get most popular albums
             var albums = GetTopSellingAlbums(6);

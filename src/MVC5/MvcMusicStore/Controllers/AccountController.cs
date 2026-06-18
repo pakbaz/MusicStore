@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading.Tasks;
-using System.Web;
-using System.Web.Mvc;
-using Microsoft.AspNet.Identity;
-using Microsoft.AspNet.Identity.EntityFramework;
-using Microsoft.Owin.Security;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
 
 namespace MvcMusicStore.Controllers
@@ -15,34 +13,30 @@ namespace MvcMusicStore.Controllers
     [Authorize]
     public class AccountController : Controller
     {
-        public AccountController()
-            : this(new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(new ApplicationDbContext())))
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+
+        public AccountController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager)
         {
+            _userManager = userManager;
+            _signInManager = signInManager;
         }
 
-        public AccountController(UserManager<ApplicationUser> userManager)
+        private void MigrateShoppingCart(string userName)
         {
-            UserManager = userManager;
-        }
-
-        public UserManager<ApplicationUser> UserManager { get; private set; }
-
-        private void MigrateShoppingCart(string UserName)
-        {
-            var storeDb = new MusicStoreEntities();
-
-            // Associate shopping cart items with logged-in user
-            var cart = ShoppingCart.GetCart(storeDb, this.HttpContext);
-            cart.MigrateCart(UserName);
+            var storeDb = HttpContext.RequestServices.GetRequiredService<MusicStoreEntities>();
+            var cart = ShoppingCart.GetCart(storeDb, HttpContext);
+            cart.MigrateCart(userName);
             storeDb.SaveChanges();
-
-            Session[ShoppingCart.CartSessionKey] = UserName;
+            HttpContext.Session.SetString(ShoppingCart.CartSessionKey, userName);
         }
 
         //
         // GET: /Account/Login
         [AllowAnonymous]
-        public ActionResult Login(string returnUrl)
+        public IActionResult Login(string? returnUrl = null)
         {
             ViewBag.ReturnUrl = returnUrl;
             return View();
@@ -53,14 +47,15 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Login(LoginViewModel model, string returnUrl)
+        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             if (ModelState.IsValid)
             {
-                var user = await UserManager.FindAsync(model.UserName, model.Password);
-                if (user != null)
+                var result = await _signInManager.PasswordSignInAsync(
+                    model.UserName, model.Password, model.RememberMe, lockoutOnFailure: false);
+                if (result.Succeeded)
                 {
-                    await SignInAsync(user, model.RememberMe);
+                    MigrateShoppingCart(model.UserName);
                     return RedirectToLocal(returnUrl);
                 }
                 else
@@ -76,7 +71,7 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Account/Register
         [AllowAnonymous]
-        public ActionResult Register()
+        public IActionResult Register()
         {
             return View();
         }
@@ -86,15 +81,16 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Register(RegisterViewModel model)
+        public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser() { UserName = model.UserName };
-                var result = await UserManager.CreateAsync(user, model.Password);
+                var user = new ApplicationUser { UserName = model.UserName };
+                var result = await _userManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
-                    await SignInAsync(user, isPersistent: false);
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    MigrateShoppingCart(user.UserName!);
                     return RedirectToAction("Index", "Home");
                 }
                 else
@@ -111,10 +107,14 @@ namespace MvcMusicStore.Controllers
         // POST: /Account/Disassociate
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Disassociate(string loginProvider, string providerKey)
+        public async Task<IActionResult> Disassociate(string loginProvider, string providerKey)
         {
             ManageMessageId? message = null;
-            IdentityResult result = await UserManager.RemoveLoginAsync(User.Identity.GetUserId(), new UserLoginInfo(loginProvider, providerKey));
+            var userId = _userManager.GetUserId(User);
+            IdentityResult result = await _userManager.RemoveLoginAsync(
+                (await _userManager.FindByIdAsync(userId!))!,
+                loginProvider, providerKey);
+
             if (result.Succeeded)
             {
                 message = ManageMessageId.RemoveLoginSuccess;
@@ -128,7 +128,7 @@ namespace MvcMusicStore.Controllers
 
         //
         // GET: /Account/Manage
-        public ActionResult Manage(ManageMessageId? message)
+        public async Task<IActionResult> Manage(ManageMessageId? message)
         {
             ViewBag.StatusMessage =
                 message == ManageMessageId.ChangePasswordSuccess ? "Your password has been changed."
@@ -136,7 +136,7 @@ namespace MvcMusicStore.Controllers
                 : message == ManageMessageId.RemoveLoginSuccess ? "The external login was removed."
                 : message == ManageMessageId.Error ? "An error has occurred."
                 : "";
-            ViewBag.HasLocalPassword = HasPassword();
+            ViewBag.HasLocalPassword = await HasPasswordAsync();
             ViewBag.ReturnUrl = Url.Action("Manage");
             return View();
         }
@@ -145,18 +145,21 @@ namespace MvcMusicStore.Controllers
         // POST: /Account/Manage
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Manage(ManageUserViewModel model)
+        public async Task<IActionResult> Manage(ManageUserViewModel model)
         {
-            bool hasPassword = HasPassword();
+            bool hasPassword = await HasPasswordAsync();
             ViewBag.HasLocalPassword = hasPassword;
             ViewBag.ReturnUrl = Url.Action("Manage");
             if (hasPassword)
             {
                 if (ModelState.IsValid)
                 {
-                    IdentityResult result = await UserManager.ChangePasswordAsync(User.Identity.GetUserId(), model.OldPassword, model.NewPassword);
+                    var user = await _userManager.GetUserAsync(User);
+                    IdentityResult result = await _userManager.ChangePasswordAsync(
+                        user!, model.OldPassword, model.NewPassword);
                     if (result.Succeeded)
                     {
+                        await _signInManager.RefreshSignInAsync(user!);
                         return RedirectToAction("Manage", new { Message = ManageMessageId.ChangePasswordSuccess });
                     }
                     else
@@ -168,7 +171,7 @@ namespace MvcMusicStore.Controllers
             else
             {
                 // User does not have a password so remove any validation errors caused by a missing OldPassword field
-                ModelState state = ModelState["OldPassword"];
+                var state = ModelState["OldPassword"];
                 if (state != null)
                 {
                     state.Errors.Clear();
@@ -176,9 +179,11 @@ namespace MvcMusicStore.Controllers
 
                 if (ModelState.IsValid)
                 {
-                    IdentityResult result = await UserManager.AddPasswordAsync(User.Identity.GetUserId(), model.NewPassword);
+                    var user = await _userManager.GetUserAsync(User);
+                    IdentityResult result = await _userManager.AddPasswordAsync(user!, model.NewPassword);
                     if (result.Succeeded)
                     {
+                        await _signInManager.RefreshSignInAsync(user!);
                         return RedirectToAction("Manage", new { Message = ManageMessageId.SetPasswordSuccess });
                     }
                     else
@@ -197,36 +202,39 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public ActionResult ExternalLogin(string provider, string returnUrl)
+        public IActionResult ExternalLogin(string provider, string? returnUrl = null)
         {
             // Request a redirect to the external login provider
-            return new ChallengeResult(provider, Url.Action("ExternalLoginCallback", "Account", new { ReturnUrl = returnUrl }));
+            var redirectUrl = Url.Action("ExternalLoginCallback", "Account", new { ReturnUrl = returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            return Challenge(properties, provider);
         }
 
         //
         // GET: /Account/ExternalLoginCallback
         [AllowAnonymous]
-        public async Task<ActionResult> ExternalLoginCallback(string returnUrl)
+        public async Task<IActionResult> ExternalLoginCallback(string? returnUrl = null)
         {
-            var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync();
-            if (loginInfo == null)
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
             {
                 return RedirectToAction("Login");
             }
 
             // Sign in the user with this external login provider if the user already has a login
-            var user = await UserManager.FindAsync(loginInfo.Login);
-            if (user != null)
+            var result = await _signInManager.ExternalLoginSignInAsync(
+                info.LoginProvider, info.ProviderKey, isPersistent: false);
+            if (result.Succeeded)
             {
-                await SignInAsync(user, isPersistent: false);
                 return RedirectToLocal(returnUrl);
             }
             else
             {
-                // If the user does not have an account, then prompt the user to create an account
+                // If the user does not have an account, prompt to create one
                 ViewBag.ReturnUrl = returnUrl;
-                ViewBag.LoginProvider = loginInfo.Login.LoginProvider;
-                return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel { UserName = loginInfo.DefaultUserName });
+                ViewBag.LoginProvider = info.LoginProvider;
+                return View("ExternalLoginConfirmation",
+                    new ExternalLoginConfirmationViewModel { UserName = info.Principal?.Identity?.Name ?? "" });
             }
         }
 
@@ -234,22 +242,26 @@ namespace MvcMusicStore.Controllers
         // POST: /Account/LinkLogin
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult LinkLogin(string provider)
+        public IActionResult LinkLogin(string provider)
         {
-            // Request a redirect to the external login provider to link a login for the current user
-            return new ChallengeResult(provider, Url.Action("LinkLoginCallback", "Account"), User.Identity.GetUserId());
+            var redirectUrl = Url.Action("LinkLoginCallback", "Account");
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(
+                provider, redirectUrl, _userManager.GetUserId(User));
+            return Challenge(properties, provider);
         }
 
         //
         // GET: /Account/LinkLoginCallback
-        public async Task<ActionResult> LinkLoginCallback()
+        public async Task<IActionResult> LinkLoginCallback()
         {
-            var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync(XsrfKey, User.Identity.GetUserId());
-            if (loginInfo == null)
+            var userId = _userManager.GetUserId(User);
+            var info = await _signInManager.GetExternalLoginInfoAsync(userId);
+            if (info == null)
             {
                 return RedirectToAction("Manage", new { Message = ManageMessageId.Error });
             }
-            var result = await UserManager.AddLoginAsync(User.Identity.GetUserId(), loginInfo.Login);
+            var user = await _userManager.FindByIdAsync(userId!);
+            var result = await _userManager.AddLoginAsync(user!, info);
             if (result.Succeeded)
             {
                 return RedirectToAction("Manage");
@@ -262,9 +274,10 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ExternalLoginConfirmation(ExternalLoginConfirmationViewModel model, string returnUrl)
+        public async Task<IActionResult> ExternalLoginConfirmation(
+            ExternalLoginConfirmationViewModel model, string? returnUrl = null)
         {
-            if (User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated == true)
             {
                 return RedirectToAction("Manage");
             }
@@ -272,19 +285,19 @@ namespace MvcMusicStore.Controllers
             if (ModelState.IsValid)
             {
                 // Get the information about the user from the external login provider
-                var info = await AuthenticationManager.GetExternalLoginInfoAsync();
+                var info = await _signInManager.GetExternalLoginInfoAsync();
                 if (info == null)
                 {
                     return View("ExternalLoginFailure");
                 }
-                var user = new ApplicationUser() { UserName = model.UserName };
-                var result = await UserManager.CreateAsync(user);
+                var user = new ApplicationUser { UserName = model.UserName };
+                var result = await _userManager.CreateAsync(user);
                 if (result.Succeeded)
                 {
-                    result = await UserManager.AddLoginAsync(user.Id, info.Login);
+                    result = await _userManager.AddLoginAsync(user, info);
                     if (result.Succeeded)
                     {
-                        await SignInAsync(user, isPersistent: false);
+                        await _signInManager.SignInAsync(user, isPersistent: false);
                         return RedirectToLocal(returnUrl);
                     }
                 }
@@ -299,74 +312,44 @@ namespace MvcMusicStore.Controllers
         // POST: /Account/LogOff
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult LogOff()
+        public async Task<IActionResult> LogOff()
         {
-            AuthenticationManager.SignOut();
+            await _signInManager.SignOutAsync();
             return RedirectToAction("Index", "Home");
         }
 
         //
         // GET: /Account/ExternalLoginFailure
         [AllowAnonymous]
-        public ActionResult ExternalLoginFailure()
+        public IActionResult ExternalLoginFailure()
         {
             return View();
         }
 
-        [ChildActionOnly]
-        public ActionResult RemoveAccountList()
+        [HttpGet]
+        public async Task<IActionResult> RemoveAccountList()
         {
-            var linkedAccounts = UserManager.GetLogins(User.Identity.GetUserId());
-            ViewBag.ShowRemoveButton = HasPassword() || linkedAccounts.Count > 1;
-            return (ActionResult)PartialView("_RemoveAccountPartial", linkedAccounts);
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && UserManager != null)
-            {
-                UserManager.Dispose();
-                UserManager = null;
-            }
-            base.Dispose(disposing);
+            var user = await _userManager.GetUserAsync(User);
+            var linkedAccounts = await _userManager.GetLoginsAsync(user!);
+            ViewBag.ShowRemoveButton = await HasPasswordAsync() || linkedAccounts.Count > 1;
+            return PartialView("_RemoveAccountPartial", linkedAccounts);
         }
 
         #region Helpers
-        // Used for XSRF protection when adding external logins
-        private const string XsrfKey = "XsrfId";
-
-        private IAuthenticationManager AuthenticationManager
-        {
-            get
-            {
-                return HttpContext.GetOwinContext().Authentication;
-            }
-        }
-
-        private async Task SignInAsync(ApplicationUser user, bool isPersistent)
-        {
-            AuthenticationManager.SignOut(DefaultAuthenticationTypes.ExternalCookie);
-            var identity = await UserManager.CreateIdentityAsync(user, DefaultAuthenticationTypes.ApplicationCookie);
-            AuthenticationManager.SignIn(new AuthenticationProperties() { IsPersistent = isPersistent }, identity);
-
-            // Migrate the user's shopping cart
-            MigrateShoppingCart(user.UserName);
-        }
-
         private void AddErrors(IdentityResult result)
         {
             foreach (var error in result.Errors)
             {
-                ModelState.AddModelError("", error);
+                ModelState.AddModelError("", error.Description);
             }
         }
 
-        private bool HasPassword()
+        private async Task<bool> HasPasswordAsync()
         {
-            var user = UserManager.FindById(User.Identity.GetUserId());
+            var user = await _userManager.GetUserAsync(User);
             if (user != null)
             {
-                return user.PasswordHash != null;
+                return await _userManager.HasPasswordAsync(user);
             }
             return false;
         }
@@ -379,43 +362,15 @@ namespace MvcMusicStore.Controllers
             Error
         }
 
-        private ActionResult RedirectToLocal(string returnUrl)
+        private IActionResult RedirectToLocal(string? returnUrl)
         {
-            if (Url.IsLocalUrl(returnUrl))
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
             else
             {
                 return RedirectToAction("Index", "Home");
-            }
-        }
-
-        private class ChallengeResult : HttpUnauthorizedResult
-        {
-            public ChallengeResult(string provider, string redirectUri) : this(provider, redirectUri, null)
-            {
-            }
-
-            public ChallengeResult(string provider, string redirectUri, string userId)
-            {
-                LoginProvider = provider;
-                RedirectUri = redirectUri;
-                UserId = userId;
-            }
-
-            public string LoginProvider { get; set; }
-            public string RedirectUri { get; set; }
-            public string UserId { get; set; }
-
-            public override void ExecuteResult(ControllerContext context)
-            {
-                var properties = new AuthenticationProperties() { RedirectUri = RedirectUri };
-                if (UserId != null)
-                {
-                    properties.Dictionary[XsrfKey] = UserId;
-                }
-                context.HttpContext.GetOwinContext().Authentication.Challenge(properties, LoginProvider);
             }
         }
         #endregion

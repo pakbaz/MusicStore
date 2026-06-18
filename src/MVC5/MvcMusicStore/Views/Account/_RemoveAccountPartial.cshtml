@@ -1,6 +1,6 @@
-﻿@model ICollection<Microsoft.AspNet.Identity.UserLoginInfo>
+@model ICollection<Microsoft.AspNetCore.Authentication.AuthenticationToken>
 
-@if (Model.Count > 0)
+@if (Model != null && Model.Count > 0)
 {
     <h4>Registered Logins</h4>
     <table class="table">
@@ -8,7 +8,7 @@
             @foreach (var account in Model)
             {
                 <tr>
-                    <td>@account.LoginProvider</td>
+                    <td>@account.Name</td>
                     <td>
                         @if (ViewBag.ShowRemoveButton)
                         {
@@ -16,9 +16,9 @@
                             {
                             @Html.AntiForgeryToken()
                             <div>
-                                @Html.Hidden("loginProvider", account.LoginProvider)
-                                @Html.Hidden("providerKey", account.ProviderKey)
-                                <input type="submit" class="btn btn-default" value="Remove" title="Remove this @account.LoginProvider login from your account" />
+                                @Html.Hidden("loginProvider", account.Name)
+                                @Html.Hidden("providerKey", account.Value)
+                                <input type="submit" class="btn btn-default" value="Remove" title="Remove this @account.Name login from your account" />
                             </div>
                             }
                         }
