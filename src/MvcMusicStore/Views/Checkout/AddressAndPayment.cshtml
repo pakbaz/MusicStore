@@ -4,30 +4,107 @@
     ViewBag.Title = "Address And Payment";
 }
 
-@section Scripts {
+@section scripts {
     <script src="~/Scripts/jquery.validate.js"></script>
     <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
 }
 
-@using (Html.BeginForm()) {
-    
+@using (Html.BeginForm())
+{
+    @Html.ValidationSummary(true, string.Empty, new { @class = "text-danger" })
+
     <h2>Address And Payment</h2>
-    <fieldset>
+    <fieldset class="form-horizontal">
         <legend>Shipping Information</legend>
 
-        @Html.EditorForModel()
-    </fieldset>
-    <fieldset>
-        <legend>Payment</legend>
-        <p>We're running a promotion: all music is free with the promo code: "FREE"</p>
+        <div class="form-group">
+            @Html.LabelFor(m => m.FirstName, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.FirstName, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.FirstName, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
 
-        <div class="editor-label">
-            @Html.Label("Promo Code")
+        <div class="form-group">
+            @Html.LabelFor(m => m.LastName, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.LastName, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.LastName, string.Empty, new { @class = "text-danger" })
+            </div>
         </div>
-        <div class="editor-field">
-            @Html.TextBox("PromoCode")
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.Address, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.Address, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.Address, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.City, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.City, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.City, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.State, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.State, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.State, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.PostalCode, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.PostalCode, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.PostalCode, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.Country, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.Country, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.Country, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.Phone, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.Phone, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.Phone, string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.Email, new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.Email, new { @class = "form-control" })
+                @Html.ValidationMessageFor(m => m.Email, string.Empty, new { @class = "text-danger" })
+            </div>
         </div>
     </fieldset>
-    
-    <input type="submit" value="Submit Order" />
+
+    <fieldset class="form-horizontal">
+        <legend>Payment</legend>
+        <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>.</p>
+
+        <div class="form-group">
+            @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code" })
+                @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
+            </div>
+        </div>
+    </fieldset>
+
+    <p>
+        <input class="btn btn-primary" type="submit" value="Submit Order" />
+        <a class="btn btn-default" href="@Url.Action("Index", "ShoppingCart")">Back to cart</a>
+    </p>
 }

@@ -78,6 +78,22 @@ namespace MvcMusicStore.Models
             return itemCount;
         }
 
+        public int UpdateCartItemCount(int id, int count)
+        {
+            var cartItem = _db.Carts.Single(
+                cart => cart.CartId == ShoppingCartId
+                && cart.RecordId == id);
+
+            if (count <= 0)
+            {
+                _db.Carts.Remove(cartItem);
+                return 0;
+            }
+
+            cartItem.Count = count;
+            return cartItem.Count;
+        }
+
         public void EmptyCart()
         {
             var cartItems = _db.Carts.Where(cart => cart.CartId == ShoppingCartId);

@@ -84,3 +84,12 @@ ul#album-list li a:hover {
 .jumbotron {
     background-color: transparent;
 }
+
+.cart-quantity-group {
+    max-width: 170px;
+}
+
+.cart-quantity-input {
+    min-width: 60px;
+    text-align: center;
+}
