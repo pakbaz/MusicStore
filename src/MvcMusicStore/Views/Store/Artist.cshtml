@@ -1,0 +1,53 @@
+﻿@model MvcMusicStore.ViewModels.ArtistDetailsViewModel
+
+@{
+    ViewBag.Title = "Artist - " + Model.Artist.Name;
+}
+
+<h2>@Model.Artist.Name</h2>
+
+<section class="discovery-section">
+    <h3>Albums by @Model.Artist.Name</h3>
+    @if (Model.Albums.Count == 0)
+    {
+        <p class="text-muted">No albums found for this artist.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled row album-grid">
+            @foreach (var album in Model.Albums)
+            {
+                <li class="col-lg-2 col-md-3 col-sm-4 col-xs-6 container">
+                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <h5>@album.Title</h5>
+                    </a>
+                    <small class="text-muted">@album.Genre?.Name</small>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="recommendations-section">
+    <h3>You may also like</h3>
+    @if (Model.RelatedAlbums.Count == 0)
+    {
+        <p class="text-muted">No related recommendations available yet.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled row recommendation-grid">
+            @foreach (var album in Model.RelatedAlbums)
+            {
+                <li class="col-md-3 col-sm-4 col-xs-6 container">
+                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <h5>@album.Title</h5>
+                    </a>
+                    <small class="text-muted">@album.Artist?.Name</small>
+                </li>
+            }
+        </ul>
+    }
+</section>

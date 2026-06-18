@@ -28,6 +28,9 @@ namespace MvcMusicStore.Models
         [StringLength(1024)]
         public string? AlbumArtUrl { get; set; }
 
+        [DisplayName("Featured Release")]
+        public bool IsFeatured { get; set; }
+
         [DataType(DataType.Date)]
         public DateTime? ReleaseDate { get; set; }
 
