@@ -22,7 +22,14 @@ namespace MvcMusicStore.Controllers
 
         public IActionResult AddressAndPayment()
         {
-            return View();
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            if (cart.GetCount() == 0)
+            {
+                TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
+                return RedirectToAction("Index", "ShoppingCart");
+            }
+
+            return View(new Order());
         }
 
         //
@@ -34,36 +41,35 @@ namespace MvcMusicStore.Controllers
             if (!ModelState.IsValid)
                 return View(order);
 
-            try
+            // Check promo code from form
+            var promoCode = Request.Form["PromoCode"].ToString();
+            if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
             {
-                // Check promo code from form
-                var promoCode = Request.Form["PromoCode"].ToString();
-                if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
-                {
-                    return View(order);
-                }
-
-                order.Username = User.Identity!.Name!;
-                order.OrderDate = DateTime.Now;
-
-                //Add the Order
-                storeDB.Orders.Add(order);
-
-                //Process the order
-                var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-                cart.CreateOrder(order);
-
-                // Save all changes
-                storeDB.SaveChanges();
-
-                return RedirectToAction("Complete",
-                    new { id = order.OrderId });
-            }
-            catch
-            {
-                //Invalid - redisplay with errors
+                ViewBag.PromoCode = promoCode;
+                ModelState.AddModelError("PromoCode", "Please enter the valid promo code to place your order.");
                 return View(order);
             }
+
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            if (cart.GetCount() == 0)
+            {
+                TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
+                return RedirectToAction("Index", "ShoppingCart");
+            }
+
+            order.Username = User.Identity!.Name!;
+            order.OrderDate = DateTime.Now;
+
+            // Add the order
+            storeDB.Orders.Add(order);
+
+            // Process the order
+            cart.CreateOrder(order);
+
+            // Save all changes
+            storeDB.SaveChanges();
+
+            return RedirectToAction("Complete", new { id = order.OrderId });
         }
 
         //
@@ -80,10 +86,9 @@ namespace MvcMusicStore.Controllers
             {
                 return View(id);
             }
-            else
-            {
-                return View("Error");
-            }
+
+            ViewBag.ErrorMessage = "We couldn't find that order for your account. Please review your recent orders or try checkout again.";
+            return View("Error");
         }
     }
 }

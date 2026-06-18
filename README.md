@@ -24,6 +24,11 @@ ASPNETCORE_URLS=http://127.0.0.1:5090 dotnet run
 
 The app will start on http://127.0.0.1:5090/.
 
+## AI Music Creation
+
+The app now includes an **AI Music** flow at `/AiMusic` (also linked in the top navigation).  
+Users can choose genre, style direction, tempo, mood, and instrumentation to generate an original track entry, then save it into the standard store catalog workflow.
+
 ## Thumbnail behavior
 
 - Storefront and admin pages always render an album thumbnail.

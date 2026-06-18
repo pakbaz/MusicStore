@@ -49,6 +49,10 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+builder.Services.Configure<AiMusicCreationOptions>(
+    builder.Configuration.GetSection(AiMusicCreationOptions.SectionName));
+builder.Services.AddScoped<IAiMusicCreationService, LocalAiMusicCreationService>();
+
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 

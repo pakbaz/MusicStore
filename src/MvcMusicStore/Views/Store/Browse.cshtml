@@ -1,21 +1,25 @@
 ﻿@model MvcMusicStore.Models.Genre
 @{
-    ViewBag.Title = "Browse Albums";
+    ViewBag.Title = Model.Name + " Albums";
 }
-<div class="genre">
-    <h3>
-        <em>@Model.Name</em> Albums
-    </h3>
 
-    <ul id="album-list" class="list-unstyled">
+<section class="content-section">
+    <div class="section-heading">
+        <h1>@Model.Name albums</h1>
+        <p class="section-subtitle">Browse @Model.Albums!.Count releases in this genre.</p>
+    </div>
+    <div class="album-grid">
         @foreach (var album in Model.Albums!)
         {
-            <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
-                <a href="@Url.Action("Details", new { id = album.AlbumId })">
+            <article class="album-card">
+                <a class="album-card-link" href="@Url.Action("Details", new { id = album.AlbumId })">
                     <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
-                    <h5 class="control-label">@album.Title</h5>
+                    <div class="album-card-body">
+                        <h3 class="album-title">@album.Title</h3>
+                        <p class="album-price">@album.Price.ToString("C")</p>
+                    </div>
                 </a>
-            </li>
+            </article>
         }
-    </ul>
-</div>
+    </div>
+</section>

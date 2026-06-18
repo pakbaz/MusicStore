@@ -2,19 +2,38 @@
     ViewBag.Title = "Home Page";
 }
 
-<div class="jumbotron">
-    <div class="row text-center">
-        <img src="~/Images/home-showcase.png" />
+<section class="hero-panel">
+    <div class="hero-copy">
+        <p class="hero-kicker">Featured right now</p>
+        <h1>Discover albums you will want on repeat.</h1>
+        <p class="hero-text">
+            Browse curated genres, explore best sellers, and build your cart with a cleaner music shopping experience.
+        </p>
+        <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="@Url.Action("Index", "Store")">Browse the catalog</a>
+        </div>
     </div>
-</div>
-<ul class="row list-unstyled" id="album-list">
+    <div class="hero-media">
+        <img src="~/Images/home-showcase.png" alt="Music showcase artwork" />
+    </div>
+</section>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Top selling albums</h2>
+        <a class="section-link" href="@Url.Action("Index", "Store")">View all genres</a>
+    </div>
+    <div class="album-grid">
     @foreach (var album in Model)
     {
-        <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
-            <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+        <article class="album-card">
+            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
                 <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
-                <h4>@album.Title</h4>
+                <div class="album-card-body">
+                    <h3 class="album-title">@album.Title</h3>
+                </div>
             </a>
-        </li>
+        </article>
     }
-</ul>
+    </div>
+</section>
