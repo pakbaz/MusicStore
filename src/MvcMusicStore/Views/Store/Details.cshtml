@@ -1,31 +1,77 @@
-﻿@model MvcMusicStore.Models.Album
+﻿@model MvcMusicStore.ViewModels.AlbumDetailsViewModel
 
 @{
-    ViewBag.Title = "Album - " + Model.Title;
+    ViewBag.Title = "Album - " + Model.Album.Title;
 }
 
-<h2>@Model.Title</h2>
+<h2>@Model.Album.Title</h2>
 
 <p>
-    <img alt="@Model.Title" src="@Url.Content(@Model.AlbumArtUrl)" />
+    <img alt="@Model.Album.Title" src="@Url.Content(@Model.Album.AlbumArtUrl)" />
 </p>
 
 <div id="album-details">
     <p>
         <em>Genre:</em>
-        @Model.Genre!.Name
+        @Model.Album.Genre!.Name
     </p>
     <p>
         <em>Artist:</em>
-        @Model.Artist!.Name
+        @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
     </p>
     <p>
         <em>Price:</em>
-        @Html.DisplayFor(model => model.Price)
+        @Html.DisplayFor(model => model.Album.Price)
     </p>
     <p class="btn btn-default">
         <span class="glyphicon glyphicon-shopping-cart"></span>
         @Html.ActionLink("Add to cart", "AddToCart",
-            "ShoppingCart", new { id = Model.AlbumId }, "")
+            "ShoppingCart", new { id = Model.Album.AlbumId }, "")
     </p>
 </div>
+
+<section class="recommendations-section">
+    <h3>Related in @Model.Album.Genre!.Name</h3>
+    @if (Model.RelatedByGenre.Count == 0)
+    {
+        <p class="text-muted">No related albums available yet.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled row recommendation-grid">
+            @foreach (var album in Model.RelatedByGenre)
+            {
+                <li class="col-md-3 col-sm-4 col-xs-6 container">
+                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <h5>@album.Title</h5>
+                    </a>
+                    <small class="text-muted">@album.Artist?.Name</small>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="recommendations-section">
+    <h3>More from @Model.Album.Artist!.Name</h3>
+    @if (Model.MoreFromArtist.Count == 0)
+    {
+        <p class="text-muted">No additional albums from this artist yet.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled row recommendation-grid">
+            @foreach (var album in Model.MoreFromArtist)
+            {
+                <li class="col-md-3 col-sm-4 col-xs-6 container">
+                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <h5>@album.Title</h5>
+                    </a>
+                    <small class="text-muted">@album.Genre?.Name</small>
+                </li>
+            }
+        </ul>
+    }
+</section>

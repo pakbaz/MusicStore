@@ -32,6 +32,9 @@
         <th>
             @Html.DisplayNameFor(model => model.Price)
         </th>
+        <th>
+            @Html.DisplayNameFor(model => model.IsFeatured)
+        </th>
         <th></th>
     </tr>
 
@@ -49,6 +52,9 @@
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.Price)
+            </td>
+            <td>
+                @(item.IsFeatured ? "Yes" : "No")
             </td>
             <td>
                 @Html.ActionLink("Edit", "Edit", new { id = item.AlbumId }) |

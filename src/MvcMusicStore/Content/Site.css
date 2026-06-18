@@ -48,25 +48,53 @@ ul#album-list li {
     height: 160px;
 }
 
-ul#album-list li img:hover {
+ul#album-list li img:hover,
+ul.album-grid li img:hover,
+ul.recommendation-grid li img:hover {
     box-shadow: 1px 1px 7px #777;
 }
 
-ul#album-list li img {
+ul#album-list li img,
+ul.album-grid li img,
+ul.recommendation-grid li img {
     box-shadow: 1px 1px 5px #999;
     border: none;
     padding: 0;
+    width: 100%;
+    max-width: 120px;
 }
 
-ul#album-list li a, ul#album-details li a {
+ul#album-list li a, ul#album-details li a, ul.album-grid li a, ul.recommendation-grid li a {
     text-decoration:none;
 }
 
-ul#album-list li a:hover {
+ul#album-list li a:hover,
+ul.album-grid li a:hover,
+ul.recommendation-grid li a:hover {
     background: none;
     -webkit-text-shadow: 1px 1px 2px #bbb;
     text-shadow: 1px 1px 2px #bbb;
     color: #363430;
+}
+
+ul.album-grid li,
+ul.recommendation-grid li {
+    min-height: 210px;
+    margin-bottom: 20px;
+}
+
+.discovery-section {
+    margin-bottom: 25px;
+}
+
+.discovery-section h2,
+.discovery-section h3,
+.recommendations-section h3 {
+    margin-bottom: 15px;
+}
+
+.recommendations-section {
+    margin-top: 25px;
 }
 
 .navbar-inverse, .navbar-inverse .navbar-brand {

@@ -34,7 +34,10 @@ namespace MvcMusicStore.Controllers
 
         public IActionResult Details(int id = 0)
         {
-            Album? album = db.Albums.Find(id);
+            Album? album = db.Albums
+                .Include(a => a.Artist)
+                .Include(a => a.Genre)
+                .SingleOrDefault(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
@@ -107,7 +110,10 @@ namespace MvcMusicStore.Controllers
 
         public IActionResult Delete(int id = 0)
         {
-            Album? album = db.Albums.Find(id);
+            Album? album = db.Albums
+                .Include(a => a.Artist)
+                .Include(a => a.Genre)
+                .SingleOrDefault(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();

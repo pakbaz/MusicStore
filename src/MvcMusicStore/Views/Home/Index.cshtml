@@ -1,4 +1,6 @@
-﻿@{
+﻿@model MvcMusicStore.ViewModels.HomeIndexViewModel
+
+@{
     ViewBag.Title = "Home Page";
 }
 
@@ -7,14 +9,51 @@
         <img src="~/Images/home-showcase.png" />
     </div>
 </div>
-<ul class="row list-unstyled" id="album-list">
-    @foreach (var album in Model)
-    {
-        <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
-            <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                <img alt="@album.Title" src="@Url.Content( @album.AlbumArtUrl)" />
-                <h4>@album.Title</h4>
-            </a>
-        </li>
-    }
-</ul>
+
+<section class="discovery-section">
+    <h2>Featured Releases</h2>
+    <ul class="row list-unstyled album-grid">
+        @foreach (var album in Model.FeaturedReleases)
+        {
+            <li class="col-lg-2 col-md-2 col-sm-3 col-xs-6 container">
+                <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <h4>@album.Title</h4>
+                </a>
+                <small class="text-muted">@album.Artist?.Name</small>
+            </li>
+        }
+    </ul>
+</section>
+
+<section class="discovery-section">
+    <h2>Trending Now</h2>
+    <ul class="row list-unstyled album-grid">
+        @foreach (var album in Model.TrendingReleases)
+        {
+            <li class="col-lg-2 col-md-2 col-sm-3 col-xs-6 container">
+                <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <h4>@album.Title</h4>
+                </a>
+                <small class="text-muted">@album.Artist?.Name</small>
+            </li>
+        }
+    </ul>
+</section>
+
+<section class="discovery-section">
+    <h2>Curated Picks</h2>
+    <ul class="row list-unstyled album-grid">
+        @foreach (var album in Model.CuratedReleases)
+        {
+            <li class="col-lg-2 col-md-2 col-sm-3 col-xs-6 container">
+                <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <h4>@album.Title</h4>
+                </a>
+                <small class="text-muted">@album.Artist?.Name</small>
+            </li>
+        }
+    </ul>
+</section>

@@ -50,6 +50,14 @@
             @Html.DisplayFor(model => model.AlbumArtUrl)
         </dd>
 
+        <dt>
+            @Html.DisplayNameFor(model => model.IsFeatured)
+        </dt>
+
+        <dd>
+            @(Model.IsFeatured ? "Yes" : "No")
+        </dd>
+
     </dl>
 </div>
 <p>
