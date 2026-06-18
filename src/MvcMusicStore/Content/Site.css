@@ -1,86 +1,411 @@
-﻿body {
-    padding-top: 50px;
-    padding-bottom: 20px;
+﻿:root {
+    --surface: #0f172a;
+    --surface-muted: #1e293b;
+    --card: #ffffff;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --accent: #7c3aed;
+    --accent-soft: #ede9fe;
+    --border: #e2e8f0;
 }
 
-/* Set padding to keep content from hitting the edges */
+html,
+body {
+    height: 100%;
+}
+
+body {
+    padding-top: 72px;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 35%, #f8fafc 100%);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+a {
+    color: #4338ca;
+}
+
+a:hover,
+a:focus {
+    color: #312e81;
+    text-decoration: none;
+}
+
 .body-content {
     padding-left: 15px;
     padding-right: 15px;
 }
 
-/* Set width on the form input elements since they're 100% wide by default */
 input,
 select,
 textarea {
-    max-width: 280px;
+    max-width: 100%;
 }
 
-/* styles for validation helpers */
-.field-validation-error {
-    color: #b94a48;
+.site-main {
+    min-height: calc(100vh - 160px);
+    padding-top: 24px;
+    padding-bottom: 40px;
 }
 
-.field-validation-valid {
+.site-header .navbar {
+    min-height: 72px;
+    background: rgba(15, 23, 42, 0.95);
+    border: none;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+}
+
+.site-header .container {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.brand-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: auto;
+    padding: 6px 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #f8fafc !important;
+}
+
+.brand-logo {
+    width: 28px;
+    height: 28px;
+}
+
+.site-nav > li > a,
+.site-utility-nav > li > a {
+    border-radius: 999px;
+    font-weight: 600;
+    color: #e2e8f0 !important;
+    padding: 10px 14px;
+    margin-top: 5px;
+}
+
+.site-nav > li > a:hover,
+.site-nav > li > a:focus,
+.site-utility-nav > li > a:hover,
+.site-utility-nav > li > a:focus,
+.site-nav > .open > a,
+.site-nav > .open > a:hover,
+.site-nav > .open > a:focus {
+    background-color: rgba(124, 58, 237, 0.35) !important;
+    color: #ffffff !important;
+}
+
+.site-header .navbar-toggle {
+    margin-top: 14px;
+    border-color: rgba(148, 163, 184, 0.8);
+}
+
+.site-header .navbar-toggle .icon-bar {
+    background-color: #e2e8f0;
+}
+
+.genre-dropdown .dropdown-menu {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 14px 24px rgba(15, 23, 42, 0.16);
+    padding: 8px;
+}
+
+.genre-dropdown .dropdown-menu > li > a {
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+.genre-dropdown .dropdown-menu > li > a:hover,
+.genre-dropdown .dropdown-menu > li > a:focus {
+    background: var(--accent-soft);
+}
+
+.nav-greeting {
+    display: none;
+}
+
+.site-footer {
+    border-top: 1px solid var(--border);
+    background: #fff;
+    padding: 16px 0;
+}
+
+.footer-meta {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.hero-panel {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 24px;
+    align-items: center;
+    background: radial-gradient(circle at top right, #ddd6fe, #ffffff 56%);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 32px;
+    margin-bottom: 28px;
+    box-shadow: 0 20px 40px rgba(76, 29, 149, 0.1);
+}
+
+.hero-kicker {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: #5b21b6;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border-radius: 999px;
+    padding: 6px 12px;
+    margin-bottom: 14px;
+}
+
+.hero-copy h1 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 38px;
+    line-height: 1.15;
+}
+
+.hero-text {
+    font-size: 17px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.hero-media img {
+    width: 100%;
+    max-width: 470px;
+    border-radius: 18px;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.2);
+}
+
+.content-section {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 22px;
+    margin-bottom: 26px;
+}
+
+.section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.section-heading h1,
+.section-heading h2 {
+    margin: 0;
+}
+
+.section-subtitle {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.section-link {
+    font-weight: 600;
+}
+
+.album-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.album-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.album-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.album-card-link {
+    display: block;
+    color: inherit;
+}
+
+.album-card img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    background: #f1f5f9;
+}
+
+.album-card-body {
+    padding: 12px;
+}
+
+.album-title {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.35;
+}
+
+.album-price {
+    margin: 6px 0 0;
+    color: #7c3aed;
+    font-weight: 700;
+}
+
+.genre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.genre-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    background: #fff;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.genre-card:hover,
+.genre-card:focus {
+    border-color: #a78bfa;
+    box-shadow: 0 10px 20px rgba(124, 58, 237, 0.12);
+    color: var(--text);
+}
+
+.genre-action {
+    color: #6d28d9;
+    font-size: 13px;
+}
+
+.album-detail {
+    display: grid;
+    grid-template-columns: minmax(220px, 320px) 1fr;
+    gap: 28px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 26px;
+}
+
+.album-detail-art img {
+    width: 100%;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+}
+
+.detail-kicker {
+    margin: 0 0 8px;
+    color: #6d28d9;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.album-detail-content h1 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.detail-artist {
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.detail-price {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 18px;
+}
+
+.detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.field-validation-error,
+.validation-summary-errors {
+    color: #b91c1c;
+}
+
+.field-validation-valid,
+.validation-summary-valid {
     display: none;
 }
 
 input.input-validation-error {
-    border: 1px solid #b94a48;
+    border: 1px solid #b91c1c;
 }
 
 input[type="checkbox"].input-validation-error {
     border: 0 none;
 }
 
-.validation-summary-errors {
-    color: #b94a48;
+@media (max-width: 991px) {
+    .site-main {
+        padding-top: 14px;
+    }
+
+    .hero-panel {
+        grid-template-columns: 1fr;
+        padding: 24px;
+    }
+
+    .hero-copy h1 {
+        font-size: 30px;
+    }
+
+    .album-detail {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
 }
 
-.validation-summary-valid {
-    display: none;
+@media (max-width: 767px) {
+    body {
+        padding-top: 64px;
+    }
+
+    .site-header .navbar {
+        min-height: 64px;
+    }
+
+    .site-header .container {
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+
+    .brand-text {
+        font-size: 18px;
+    }
+
+    .section-heading {
+        margin-bottom: 12px;
+    }
+
+    .content-section {
+        padding: 16px;
+    }
+
+    .site-utility-nav {
+        margin-top: 6px;
+    }
 }
 
-
-/* Music Store additions */
-
-ul#album-list li {
-    height: 160px;
-}
-
-ul#album-list li img:hover {
-    box-shadow: 1px 1px 7px #777;
-}
-
-ul#album-list li img {
-    box-shadow: 1px 1px 5px #999;
-    border: none;
-    padding: 0;
-}
-
-ul#album-list li a, ul#album-details li a {
-    text-decoration:none;
-}
-
-ul#album-list li a:hover {
-    background: none;
-    -webkit-text-shadow: 1px 1px 2px #bbb;
-    text-shadow: 1px 1px 2px #bbb;
-    color: #363430;
-}
-
-.navbar-inverse, .navbar-inverse .navbar-brand {
-    color: #ddd;
-}
-
-.navbar-inverse .navbar-text {
-  color: #ddd;
-}
-
-.navbar-inverse .navbar-nav > li > a {
-  color: #ddd;
-}
-
-.jumbotron {
-    background-color: transparent;
+@media (min-width: 992px) {
+    .nav-greeting {
+        display: list-item;
+    }
 }
