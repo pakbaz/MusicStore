@@ -85,6 +85,11 @@ static async Task SeedDatabaseAsync(WebApplication app)
         // Ensure databases are created
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
+        if (!await HasAlbumCatalogColumnsAsync(musicStoreDb))
+        {
+            await musicStoreDb.Database.EnsureDeletedAsync();
+            await musicStoreDb.Database.EnsureCreatedAsync();
+        }
 
         var identityDb = services.GetRequiredService<ApplicationDbContext>();
         await identityDb.Database.EnsureCreatedAsync();
@@ -122,4 +127,34 @@ static async Task SeedDatabaseAsync(WebApplication app)
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while seeding the database.");
     }
+}
+
+static async Task<bool> HasAlbumCatalogColumnsAsync(MusicStoreEntities dbContext)
+{
+    await using var connection = dbContext.Database.GetDbConnection();
+    if (connection.State != System.Data.ConnectionState.Open)
+    {
+        await connection.OpenAsync();
+    }
+
+    await using var command = connection.CreateCommand();
+    command.CommandText = "PRAGMA table_info('Albums');";
+
+    await using var reader = await command.ExecuteReaderAsync();
+    var hasReleaseDate = false;
+    var hasIsAvailable = false;
+    while (await reader.ReadAsync())
+    {
+        var columnName = reader.GetString(reader.GetOrdinal("name"));
+        if (string.Equals(columnName, "ReleaseDate", StringComparison.OrdinalIgnoreCase))
+        {
+            hasReleaseDate = true;
+        }
+        else if (string.Equals(columnName, "IsAvailable", StringComparison.OrdinalIgnoreCase))
+        {
+            hasIsAvailable = true;
+        }
+    }
+
+    return hasReleaseDate && hasIsAvailable;
 }
