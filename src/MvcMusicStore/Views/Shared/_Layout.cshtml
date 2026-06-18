@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@ViewBag.Title – MVC Music Store</title>
+    <script>
+        (function () {
+            var storedTheme = localStorage.getItem('musicstore-theme');
+            var initialTheme = storedTheme === 'dark' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', initialTheme);
+        })();
+    </script>
     <link href="~/Content/bootstrap.css" rel="stylesheet" />
     <link href="~/Content/Site.css" rel="stylesheet" />
     <script src="~/Scripts/modernizr-2.6.2.js"></script>
@@ -25,6 +32,9 @@
                     @await Component.InvokeAsync("GenreMenu")
                     @await Component.InvokeAsync("CartSummary")
                 </ul>
+                <div class="navbar-text navbar-right theme-toggle-container">
+                    <button id="theme-toggle" class="btn btn-default btn-xs" type="button" aria-pressed="false">Dark mode</button>
+                </div>
                 @await Html.PartialAsync("_LoginPartial")
             </div>
         </div>
@@ -40,6 +50,31 @@
 
     <script src="~/Scripts/jquery-1.10.2.js"></script>
     <script src="~/Scripts/bootstrap.js"></script>
+    <script>
+        (function () {
+            var themeStorageKey = 'musicstore-theme';
+            var themeToggleButton = document.getElementById('theme-toggle');
+            if (!themeToggleButton) {
+                return;
+            }
+
+            function applyTheme(theme) {
+                var isDark = theme === 'dark';
+                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+                localStorage.setItem(themeStorageKey, isDark ? 'dark' : 'light');
+                themeToggleButton.textContent = isDark ? 'Light mode' : 'Dark mode';
+                themeToggleButton.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+                themeToggleButton.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            }
+
+            themeToggleButton.addEventListener('click', function () {
+                var currentTheme = document.documentElement.getAttribute('data-theme');
+                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+            });
+
+            applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+        })();
+    </script>
     @RenderSection("scripts", required: false)
 </body>
 </html>
