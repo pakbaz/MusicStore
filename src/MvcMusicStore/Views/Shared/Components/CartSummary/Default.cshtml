@@ -1,9 +1,11 @@
-@if (ViewBag.CartCount > 0)
-{
-    <li class="cart-nav-item">
-        <a href="@Url.Action("Index", "ShoppingCart")" title="@ViewBag.CartSummary">
-            <span class="glyphicon glyphicon-shopping-cart"></span>
-            Cart (@ViewBag.CartCount)
-        </a>
-    </li>
-}
+@model MvcMusicStore.ViewModels.CartSummaryViewModel
+
+<li id="cart-summary-item" class="cart-nav-item @(Model.CartCount > 0 ? string.Empty : "hidden")">
+    <a id="cart-summary-link"
+       href="@Url.Action("Index", "ShoppingCart")"
+       title="@Model.CartSummary"
+       aria-label="Shopping cart with @Model.CartCount item(s)">
+        <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
+        Cart (<span id="cart-summary-count">@Model.CartCount</span>)
+    </a>
+</li>
