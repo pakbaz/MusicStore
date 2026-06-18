@@ -1,0 +1,27 @@
+{
+  "$schema": "tasks-schema.json",
+  "description": ".NET version upgrade plan from .NET Framework 4.8 to .NET 10.0",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-dotnet-to-net10",
+      "description": "Upgrade MvcMusicStore from .NET Framework 4.8 to .NET 10.0",
+      "reason": "The project targets .NET Framework 4.8, which is a legacy framework that does not support modern .NET APIs, ASP.NET Core, or current Azure SDK packages. The user has explicitly requested an upgrade to the latest LTS version. Upgrading to .NET 10.0 LTS provides long-term support, performance improvements, access to modern APIs, and full compatibility with current Azure SDK and tooling.",
+      "requirements": "Upgrade the MvcMusicStore project from .NET Framework 4.8 to .NET 10.0. This includes converting the legacy non-SDK-style project file to SDK-style format, migrating from ASP.NET MVC 5 (System.Web) to ASP.NET Core MVC, replacing OWIN/Katana middleware with ASP.NET Core middleware, upgrading ASP.NET Identity 1.x to ASP.NET Core Identity, migrating Entity Framework 6 to EF Core, replacing Web.config with appsettings.json-based configuration, and updating all NuGet packages to versions compatible with net10.0.",
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      },
+      "status": "started"
+    }
+  ],
+  "metadata": {
+    "planName": "upgrade-to-lts",
+    "projectName": "MvcMusicStore",
+    "language": "dotnet",
+    "createdAt": "2026-06-18T17:58:37.000Z",
+    "version": "1.0"
+  }
+}
