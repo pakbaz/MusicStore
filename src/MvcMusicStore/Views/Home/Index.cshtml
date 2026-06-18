@@ -12,7 +12,7 @@
     {
         <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
             <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                <img alt="@album.Title" src="@Url.Content( @album.AlbumArtUrl)" />
+                <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
                 <h4>@album.Title</h4>
             </a>
         </li>

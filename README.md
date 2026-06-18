@@ -24,6 +24,12 @@ ASPNETCORE_URLS=http://127.0.0.1:5090 dotnet run
 
 The app will start on http://127.0.0.1:5090/.
 
+## Thumbnail behavior
+
+- Storefront and admin pages always render an album thumbnail.
+- Thumbnail precedence is: uploaded custom image, metadata-fetched artwork, then placeholder image.
+- Admin create/edit pages support uploading custom image files (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`).
+
 ## Additional Resources
 
 Tutorial documentation is available on [Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/mvc/overview/older-versions/mvc-music-store/).

@@ -6,7 +6,7 @@
 
 <h2>Create</h2>
 
-@using (Html.BeginForm()) 
+@using (Html.BeginForm("Create", "StoreManager", FormMethod.Post, new { enctype = "multipart/form-data" })) 
 {
     @Html.AntiForgeryToken()
     
@@ -52,6 +52,16 @@
             <div class="col-md-10">
                 @Html.EditorFor(model => model.AlbumArtUrl)
                 @Html.ValidationMessageFor(model => model.AlbumArtUrl)
+                <p class="help-block">Optional legacy/manual URL. If empty, metadata artwork is fetched when available.</p>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="control-label col-md-2" for="thumbnailFile">Custom Thumbnail</label>
+            <div class="col-md-10">
+                <input type="file" id="thumbnailFile" name="thumbnailFile" accept=".png,.jpg,.jpeg,.gif,.webp,image/*" class="form-control" />
+                @Html.ValidationMessage("thumbnailFile")
+                <p class="help-block">Uploaded thumbnails override metadata and placeholder images.</p>
             </div>
         </div>
 

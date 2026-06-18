@@ -50,6 +50,30 @@
             @Html.DisplayFor(model => model.AlbumArtUrl)
         </dd>
 
+        <dt>
+            @Html.DisplayNameFor(model => model.MetadataThumbnailUrl)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.MetadataThumbnailUrl)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.UploadedThumbnailUrl)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.UploadedThumbnailUrl)
+        </dd>
+
+        <dt>
+            Effective Thumbnail
+        </dt>
+
+        <dd>
+            <img alt="@Model.Title thumbnail" src="@Url.Content(Model.GetDisplayThumbnailUrl())" class="admin-thumbnail-preview" />
+        </dd>
+
     </dl>
 </div>
 <p>

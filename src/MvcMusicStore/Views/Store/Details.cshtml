@@ -7,7 +7,7 @@
 <h2>@Model.Title</h2>
 
 <p>
-    <img alt="@Model.Title" src="@Url.Content(@Model.AlbumArtUrl)" />
+    <img alt="@Model.Title" src="@Url.Content(Model.GetDisplayThumbnailUrl())" />
 </p>
 
 <div id="album-details">
