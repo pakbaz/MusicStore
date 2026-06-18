@@ -56,15 +56,14 @@ namespace MvcMusicStore.Models
             }
             return DefaultPlaceholderThumbnailUrl;
         }
-        }
+
         [DisplayName("Featured Release")]
         public bool IsFeatured { get; set; }
-        public bool IsFeatured { get; set; }
+
         [DataType(DataType.Date)]
         public DateTime? ReleaseDate { get; set; }
-        public DateTime? ReleaseDate { get; set; }
+
         [DisplayName("Available")]
-        public bool IsAvailable { get; set; } = true;
         public bool IsAvailable { get; set; } = true;
 
         public virtual Genre? Genre { get; set; }

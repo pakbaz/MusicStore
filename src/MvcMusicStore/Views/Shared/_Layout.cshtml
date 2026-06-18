@@ -13,14 +13,16 @@
                 savedTheme = null;
             }
 
-            var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
             var theme = savedTheme === "dark" || savedTheme === "light"
                 ? savedTheme
-                : (prefersDark ? "dark" : "light");
+                : "dark";
             document.documentElement.setAttribute("data-theme", theme);
         }());
     </script>
     <title>@ViewBag.Title - MVC Music Store</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="~/Content/bootstrap.css" rel="stylesheet" />
     <link href="~/Content/Site.css" rel="stylesheet" />
     <script src="~/Scripts/modernizr-2.6.2.js"></script>

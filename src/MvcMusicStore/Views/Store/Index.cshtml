@@ -65,18 +65,17 @@
     }
     else
     {
-        <ul id="album-list" class="row list-unstyled">
+        <ul id="album-list" class="list-unstyled">
             @foreach (var album in Model.Albums)
             {
-                <li class="col-lg-2 col-md-3 col-sm-4 col-xs-6 container">
+                <li>
                     <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
                         <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
-                        <h2 class="h5 control-label">@album.Title</h2>
+                        <h2 class="h5">@album.Title</h2>
                     </a>
-                    <small class="text-muted">@album.ArtistName</small><br />
-                    <small class="text-muted">@album.GenreName</small><br />
-                    <small class="text-muted">@album.Price.ToString("C")</small><br />
-                    <small class="text-muted">Released: @(album.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</small><br />
+                    <small class="text-muted">@album.ArtistName</small>
+                    <small class="text-muted">@album.GenreName · @album.Price.ToString("C")</small>
+                    <small class="text-muted">Released: @(album.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</small>
                     @if (album.IsAvailable)
                     {
                         <span class="label label-success">In stock</span>
