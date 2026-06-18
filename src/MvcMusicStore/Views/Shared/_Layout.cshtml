@@ -3,40 +3,54 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@ViewBag.Title – MVC Music Store</title>
+    <title>@ViewBag.Title - MVC Music Store</title>
     <link href="~/Content/bootstrap.css" rel="stylesheet" />
     <link href="~/Content/Site.css" rel="stylesheet" />
     <script src="~/Scripts/modernizr-2.6.2.js"></script>
 </head>
 <body>
-    <div class="navbar navbar-inverse navbar-fixed-top">
-        <div class="container">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-                @Html.ActionLink("ASP.NET MVC Music Store", "Index", "Home", null, new { @class = "navbar-brand" })
+    <header class="site-header">
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-navigation">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand brand-link" href="@Url.Action("Index", "Home")">
+                        <img src="~/Images/logo.svg" alt="Music Store logo" class="brand-logo" />
+                        <span class="brand-text">Music Store</span>
+                    </a>
+                </div>
+                <div class="collapse navbar-collapse" id="main-navigation">
+                    <ul class="nav navbar-nav site-nav">
+                        <li>@Html.ActionLink("Home", "Index", "Home")</li>
+                        <li>@Html.ActionLink("Browse", "Index", "Store")</li>
+                        <li>@Html.ActionLink("AI Music", "Index", "AiMusic")</li>
+                        @await Component.InvokeAsync("GenreMenu")
+                    </ul>
+                    <ul class="nav navbar-nav navbar-right site-utility-nav">
+                        @await Component.InvokeAsync("CartSummary")
+                        @await Html.PartialAsync("_LoginPartial")
+                    </ul>
+                </div>
             </div>
-            <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav">
-                    <li>@Html.ActionLink("Home", "Index", "Home")</li>
-                    @await Component.InvokeAsync("GenreMenu")
-                    @await Component.InvokeAsync("CartSummary")
-                </ul>
-                @await Html.PartialAsync("_LoginPartial")
-            </div>
-        </div>
-    </div>
-    <div class="container body-content">
+        </nav>
+    </header>
+
+    <main class="container body-content site-main">
         @RenderBody()
-        <hr />
-        <footer class="navbar navbar-fixed-bottom navbar-default text-center">
-            <p><a href="http://mvcmusicstore.codeplex.com">mvcmusicstore.codeplex.com</a></p>
-            <small>@Html.ActionLink("admin", "Index", "StoreManager")</small>
-        </footer>
-    </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container text-center">
+            <p class="footer-meta">
+                Built from the MVC Music Store sample ·
+                @Html.ActionLink("Admin", "Index", "StoreManager")
+            </p>
+        </div>
+    </footer>
 
     <script src="~/Scripts/jquery-1.10.2.js"></script>
     <script src="~/Scripts/bootstrap.js"></script>

@@ -1,6 +1,7 @@
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
+using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.ViewComponents
 {
@@ -18,13 +19,17 @@ namespace MvcMusicStore.ViewComponents
             var cart = ShoppingCart.GetCart(_db, HttpContext);
 
             var cartItems = cart.GetCartItems()
-                .Select(a => a.Album!.Title)
-                .OrderBy(x => x);
+                .Where(item => item.Album != null)
+                .OrderBy(item => item.Album!.Title)
+                .ToList();
 
-            ViewBag.CartCount = cartItems.Count();
-            ViewBag.CartSummary = string.Join("\n", cartItems.Distinct());
+            var viewModel = new CartSummaryViewModel
+            {
+                CartCount = cartItems.Sum(item => item.Count),
+                CartSummary = string.Join("\n", cartItems.Select(item => $"{item.Album!.Title} x{item.Count}"))
+            };
 
-            return View();
+            return View(viewModel);
         }
     }
 }
