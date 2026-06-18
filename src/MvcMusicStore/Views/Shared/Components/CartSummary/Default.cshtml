@@ -1,8 +1,8 @@
 @model MvcMusicStore.ViewModels.CartSummaryViewModel
 
-<li id="cart-summary-item" class="@(Model.CartCount > 0 ? string.Empty : "hidden")">
+<li id="cart-summary-item" class="cart-nav-item @(Model.CartCount > 0 ? string.Empty : "hidden")">
     <a id="cart-summary-link" href="@Url.Action("Index", "ShoppingCart")" title="@Model.CartSummary">
         <span class="glyphicon glyphicon-shopping-cart"></span>
-        <span id="cart-summary-count">@Model.CartCount</span>
+        Cart (<span id="cart-summary-count">@Model.CartCount</span>)
     </a>
 </li>
