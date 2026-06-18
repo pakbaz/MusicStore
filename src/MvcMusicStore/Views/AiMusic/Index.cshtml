@@ -1,0 +1,68 @@
+@model MvcMusicStore.ViewModels.AiMusicGenerationRequestViewModel
+
+@{
+    ViewBag.Title = "AI Music Creation";
+}
+
+<h2>AI Music Creation</h2>
+<p>Generate an original track concept from your chosen genre and musical direction.</p>
+
+@using (Html.BeginForm("Index", "AiMusic", FormMethod.Post))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.GenreId, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.GenreId, Model.Genres, "-- Select genre --", new { @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.GenreId)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.StyleDirection, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.StyleDirection, Model.StyleDirections, "-- Select style direction --", new { @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.StyleDirection)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.Mood, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.Mood, Model.MoodOptions, "-- Select mood --", new { @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.Mood)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.Instrumentation, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.Instrumentation, Model.InstrumentationOptions, "-- Select instrumentation --", new { @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.Instrumentation)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.TempoBpm, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.TextBoxFor(model => model.TempoBpm, new { @class = "form-control", type = "number", min = "40", max = "220" })
+                @Html.ValidationMessageFor(model => model.TempoBpm)
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-md-offset-2 col-md-10">
+                <input type="submit" value="Generate Original Track" class="btn btn-primary" />
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}
