@@ -3,13 +3,13 @@
   "operationId": "1b46dc10-8b24-49fd-a35d-07f419d1501c",
   "description": "Upgrade .NET projects to newer .NET versions, including guidance on current release status, support lifecycle (LTS/STS), and recommended upgrade targets.",
   "startTime": "2026-06-18T18:02:12.544297Z",
-  "lastUpdateTime": "2026-06-18T18:19:34.026726Z",
+  "lastUpdateTime": "2026-06-18T18:22:59.753536Z",
   "properties": {
     "UpgradeTargetFramework": "net10.0",
     "taskStates": {
       "01-prerequisites": "Completed",
       "02-sdk-style-conversion": "Completed",
-      "03-migrate-to-aspnet-core": "InProgress",
+      "03-migrate-to-aspnet-core": "Completed",
       "03.01-project-and-config": "Completed",
       "03.02-program-and-startup": "Completed",
       "03.03-models-ef-identity": "Completed",
@@ -17,7 +17,8 @@
       "03.05-view-components": "Completed",
       "03.06-views": "Completed",
       "03.07-delete-legacy": "Completed",
-      "03.08-fix-build": "InProgress"
+      "03.08-fix-build": "Completed",
+      "04-final-validation": "InProgress"
     }
   },
   "folderPath": ""

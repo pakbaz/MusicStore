@@ -57,15 +57,15 @@
         </th>
         <th></th>
     </tr>
-    @foreach (var item in Model.CartItems)
+    @foreach (var item in Model.CartItems!)
     {
         <tr id="row-@item.RecordId">
             <td>
-                @Html.ActionLink(item.Album.Title,
+                @Html.ActionLink(item.Album!.Title,
                     "Details", "Store", new { id = item.AlbumId }, null)
             </td>
             <td>
-                @item.Album.Price
+                @item.Album!.Price
             </td>
             <td id="item-count-@item.RecordId">
                 @item.Count

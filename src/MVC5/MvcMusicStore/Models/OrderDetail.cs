@@ -1,4 +1,4 @@
-﻿namespace MvcMusicStore.Models
+namespace MvcMusicStore.Models
 {
     public class OrderDetail
     {
@@ -8,7 +8,7 @@
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
 
-        public virtual Album Album { get; set; }
-        public virtual Order Order { get; set; }
+        public virtual Album? Album { get; set; }
+        public virtual Order? Order { get; set; }
     }
 }

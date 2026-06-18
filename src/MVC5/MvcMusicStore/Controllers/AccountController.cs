@@ -52,10 +52,10 @@ namespace MvcMusicStore.Controllers
             if (ModelState.IsValid)
             {
                 var result = await _signInManager.PasswordSignInAsync(
-                    model.UserName, model.Password, model.RememberMe, lockoutOnFailure: false);
+                    model.UserName!, model.Password!, model.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
-                    MigrateShoppingCart(model.UserName);
+                    MigrateShoppingCart(model.UserName!);
                     return RedirectToLocal(returnUrl);
                 }
                 else
@@ -86,7 +86,7 @@ namespace MvcMusicStore.Controllers
             if (ModelState.IsValid)
             {
                 var user = new ApplicationUser { UserName = model.UserName };
-                var result = await _userManager.CreateAsync(user, model.Password);
+                var result = await _userManager.CreateAsync(user, model.Password!);
                 if (result.Succeeded)
                 {
                     await _signInManager.SignInAsync(user, isPersistent: false);
@@ -156,7 +156,7 @@ namespace MvcMusicStore.Controllers
                 {
                     var user = await _userManager.GetUserAsync(User);
                     IdentityResult result = await _userManager.ChangePasswordAsync(
-                        user!, model.OldPassword, model.NewPassword);
+                        user!, model.OldPassword!, model.NewPassword!);
                     if (result.Succeeded)
                     {
                         await _signInManager.RefreshSignInAsync(user!);
@@ -180,7 +180,7 @@ namespace MvcMusicStore.Controllers
                 if (ModelState.IsValid)
                 {
                     var user = await _userManager.GetUserAsync(User);
-                    IdentityResult result = await _userManager.AddPasswordAsync(user!, model.NewPassword);
+                    IdentityResult result = await _userManager.AddPasswordAsync(user!, model.NewPassword!);
                     if (result.Succeeded)
                     {
                         await _signInManager.RefreshSignInAsync(user!);

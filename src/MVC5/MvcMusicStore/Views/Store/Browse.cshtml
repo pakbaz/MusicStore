@@ -8,7 +8,7 @@
     </h3>
 
     <ul id="album-list" class="list-unstyled">
-        @foreach (var album in Model.Albums)
+        @foreach (var album in Model.Albums!)
         {
             <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
                 <a href="@Url.Action("Details", new { id = album.AlbumId })">

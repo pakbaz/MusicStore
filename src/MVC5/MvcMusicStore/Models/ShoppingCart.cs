@@ -112,7 +112,7 @@ namespace MvcMusicStore.Models
             // sum all album price totals to get the cart total
             decimal? total = (from cartItems in _db.Carts
                               where cartItems.CartId == ShoppingCartId
-                              select (int?)cartItems.Count * cartItems.Album.Price).Sum();
+                              select (int?)cartItems.Count * (cartItems.Album != null ? cartItems.Album.Price : 0)).Sum();
             return total ?? decimal.Zero;
         }
 
@@ -126,6 +126,7 @@ namespace MvcMusicStore.Models
             foreach (var item in cartItems)
             {
                 var album = _db.Albums.Find(item.AlbumId);
+                if (album == null) continue;
 
                 var orderDetail = new OrderDetail
                 {
@@ -136,7 +137,7 @@ namespace MvcMusicStore.Models
                 };
 
                 // Set the order total of the shopping cart
-                orderTotal += (item.Count * item.Album.Price);
+                orderTotal += (item.Count * album.Price);
 
                 _db.OrderDetails.Add(orderDetail);
             }

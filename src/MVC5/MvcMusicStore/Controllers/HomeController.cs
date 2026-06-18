@@ -32,7 +32,7 @@ namespace MvcMusicStore.Controllers
             // the albums with the highest count
 
             return storeDB.Albums
-                .OrderByDescending(a => a.OrderDetails.Count())
+                .OrderByDescending(a => a.OrderDetails != null ? a.OrderDetails.Count() : 0)
                 .Take(count)
                 .ToList();
         }

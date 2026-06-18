@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace MvcMusicStore.Models 
+namespace MvcMusicStore.Models
 {
     public class Album {
         [ScaffoldColumn(false)]
@@ -15,7 +15,7 @@ namespace MvcMusicStore.Models
 
         [Required]
         [StringLength(160, MinimumLength = 2)]
-        public string Title { get; set; }
+        public string? Title { get; set; }
 
         [Required]
         [Range(0.01, 100.00)]
@@ -25,10 +25,10 @@ namespace MvcMusicStore.Models
 
         [DisplayName("Album Art URL")]
         [StringLength(1024)]
-        public string AlbumArtUrl { get; set; }
+        public string? AlbumArtUrl { get; set; }
 
-        public virtual Genre Genre { get; set; }
-        public virtual Artist Artist { get; set; }
-        public virtual List<OrderDetail> OrderDetails { get; set; }
+        public virtual Genre? Genre { get; set; }
+        public virtual Artist? Artist { get; set; }
+        public virtual List<OrderDetail>? OrderDetails { get; set; }
     }
 }
