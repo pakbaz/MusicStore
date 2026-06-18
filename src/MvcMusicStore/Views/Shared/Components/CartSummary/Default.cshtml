@@ -1,9 +1,13 @@
 @if (ViewBag.CartCount > 0)
 {
     <li>
-        <a href="@Url.Action("Index", "ShoppingCart")" title="@ViewBag.CartSummary">
-            <span class="glyphicon glyphicon glyphicon-shopping-cart"></span>
-            @ViewBag.CartCount
+        <a id="cart-status"
+           href="@Url.Action("Index", "ShoppingCart")"
+           title="@ViewBag.CartSummary"
+           aria-label="Shopping cart with @ViewBag.CartCount item(s)">
+            <span class="glyphicon glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
+            <span class="sr-only">Shopping cart</span>
+            <span id="cart-count">@ViewBag.CartCount</span>
         </a>
     </li>
 }

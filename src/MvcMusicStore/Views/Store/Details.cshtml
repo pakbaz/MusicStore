@@ -4,7 +4,7 @@
     ViewBag.Title = "Album - " + Model.Title;
 }
 
-<h2>@Model.Title</h2>
+<h1>@Model.Title</h1>
 
 <p>
     <img alt="@Model.Title" src="@Url.Content(@Model.AlbumArtUrl)" />
@@ -23,9 +23,12 @@
         <em>Price:</em>
         @Html.DisplayFor(model => model.Price)
     </p>
-    <p class="btn btn-default">
-        <span class="glyphicon glyphicon-shopping-cart"></span>
-        @Html.ActionLink("Add to cart", "AddToCart",
-            "ShoppingCart", new { id = Model.AlbumId }, "")
+    <p>
+        <a class="btn btn-default"
+           href="@Url.Action("AddToCart", "ShoppingCart", new { id = Model.AlbumId })"
+           aria-label="Add @Model.Title to cart">
+            <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
+            Add to cart
+        </a>
     </p>
 </div>

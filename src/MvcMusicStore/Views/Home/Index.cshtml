@@ -3,17 +3,19 @@
 }
 
 <div class="jumbotron">
+    <h1 class="sr-only">Featured Albums</h1>
     <div class="row text-center">
-        <img src="~/Images/home-showcase.png" />
+        <img src="~/Images/home-showcase.png" alt="Music Store featured albums showcase" class="img-responsive center-block" />
     </div>
 </div>
-<ul class="row list-unstyled" id="album-list">
+<h2>Top-selling albums</h2>
+<ul class="row list-unstyled" id="album-list" aria-label="Top-selling albums">
     @foreach (var album in Model)
     {
         <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
             <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
                 <img alt="@album.Title" src="@Url.Content( @album.AlbumArtUrl)" />
-                <h4>@album.Title</h4>
+                <h3 class="h4">@album.Title</h3>
             </a>
         </li>
     }

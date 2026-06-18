@@ -3,43 +3,127 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            var storageKey = "mvcMusicStoreTheme";
+            var savedTheme = null;
+            try {
+                savedTheme = localStorage.getItem(storageKey);
+            } catch (e) {
+                savedTheme = null;
+            }
+
+            var supportsDarkScheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            var selectedTheme = savedTheme === "dark" || savedTheme === "light"
+                ? savedTheme
+                : (supportsDarkScheme ? "dark" : "light");
+            document.documentElement.setAttribute("data-theme", selectedTheme);
+        }());
+    </script>
     <title>@ViewBag.Title – MVC Music Store</title>
     <link href="~/Content/bootstrap.css" rel="stylesheet" />
     <link href="~/Content/Site.css" rel="stylesheet" />
     <script src="~/Scripts/modernizr-2.6.2.js"></script>
 </head>
 <body>
-    <div class="navbar navbar-inverse navbar-fixed-top">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <header class="navbar navbar-inverse navbar-fixed-top" role="banner">
         <div class="container">
             <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <button type="button"
+                        class="navbar-toggle"
+                        data-toggle="collapse"
+                        data-target="#main-navigation"
+                        aria-controls="main-navigation"
+                        aria-expanded="false"
+                        aria-label="Toggle navigation">
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
                 @Html.ActionLink("ASP.NET MVC Music Store", "Index", "Home", null, new { @class = "navbar-brand" })
             </div>
-            <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav">
+            <nav id="main-navigation" class="navbar-collapse collapse" aria-label="Primary">
+                <ul class="nav navbar-nav" role="menubar">
                     <li>@Html.ActionLink("Home", "Index", "Home")</li>
                     @await Component.InvokeAsync("GenreMenu")
                     @await Component.InvokeAsync("CartSummary")
                 </ul>
+                <ul class="nav navbar-nav navbar-right theme-toggle-nav">
+                    <li>
+                        <button id="theme-toggle"
+                                type="button"
+                                class="btn btn-link navbar-btn"
+                                aria-label="Switch to dark mode"
+                                aria-pressed="false">
+                            Dark mode
+                        </button>
+                    </li>
+                </ul>
                 @await Html.PartialAsync("_LoginPartial")
-            </div>
+            </nav>
         </div>
-    </div>
-    <div class="container body-content">
+    </header>
+    <main id="main-content" class="container body-content" tabindex="-1">
         @RenderBody()
         <hr />
-        <footer class="navbar navbar-fixed-bottom navbar-default text-center">
+        <footer class="navbar navbar-fixed-bottom navbar-default text-center" role="contentinfo">
             <p><a href="http://mvcmusicstore.codeplex.com">mvcmusicstore.codeplex.com</a></p>
             <small>@Html.ActionLink("admin", "Index", "StoreManager")</small>
         </footer>
-    </div>
+    </main>
 
     <script src="~/Scripts/jquery-1.10.2.js"></script>
     <script src="~/Scripts/bootstrap.js"></script>
+    <script>
+        (function () {
+            var themeToggle = document.getElementById("theme-toggle");
+            if (!themeToggle) {
+                return;
+            }
+
+            var storageKey = "mvcMusicStoreTheme";
+
+            function setTheme(theme) {
+                document.documentElement.setAttribute("data-theme", theme);
+                var isDark = theme === "dark";
+                themeToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+                themeToggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+                themeToggle.textContent = isDark ? "Light mode" : "Dark mode";
+            }
+
+            function getInitialTheme() {
+                var savedTheme = null;
+                try {
+                    savedTheme = localStorage.getItem(storageKey);
+                } catch (e) {
+                    savedTheme = null;
+                }
+
+                if (savedTheme === "dark" || savedTheme === "light") {
+                    return savedTheme;
+                }
+
+                return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+                    ? "dark"
+                    : "light";
+            }
+
+            setTheme(getInitialTheme());
+
+            themeToggle.addEventListener("click", function () {
+                var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+                var nextTheme = currentTheme === "dark" ? "light" : "dark";
+                setTheme(nextTheme);
+                try {
+                    localStorage.setItem(storageKey, nextTheme);
+                } catch (e) {
+                    // Intentionally ignored if storage is unavailable.
+                }
+            });
+        }());
+    </script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

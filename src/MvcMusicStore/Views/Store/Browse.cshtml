@@ -3,11 +3,11 @@
     ViewBag.Title = "Browse Albums";
 }
 <div class="genre">
-    <h3>
+    <h1>
         <em>@Model.Name</em> Albums
-    </h3>
+    </h1>
 
-    <ul id="album-list" class="list-unstyled">
+    <ul id="album-list" class="list-unstyled" aria-label="@Model.Name albums">
         @foreach (var album in Model.Albums!)
         {
             <li class="col-lg-2 col-md-2 col-sm-2 col-xs-4 container">
@@ -16,7 +16,7 @@
                     {
                         <img alt="@album.Title" src="@Url.Content(@album.AlbumArtUrl)" />
                     }
-                    <h5 class="control-label">@album.Title</h5>
+                    <h2 class="h5 control-label">@album.Title</h2>
                 </a>
             </li>
         }
