@@ -74,6 +74,34 @@
         </div>
 
         <div class="form-group">
+            @Html.LabelFor(model => model.IsFeatured, new { @class = "control-label col-md-2" })
+            <div class="col-md-10 checkbox">
+                <label>
+                    @Html.CheckBoxFor(model => model.IsFeatured) Show on featured releases
+                </label>
+                @Html.ValidationMessageFor(model => model.IsFeatured)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.ReleaseDate, new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.TextBoxFor(model => model.ReleaseDate, "{0:yyyy-MM-dd}", new { @class = "form-control", type = "date" })
+                @Html.ValidationMessageFor(model => model.ReleaseDate)
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(model => model.IsAvailable, new { @class = "control-label col-md-2" })
+            <div class="col-md-10 checkbox">
+                <label>
+                    @Html.CheckBoxFor(model => model.IsAvailable) In stock
+                </label>
+                @Html.ValidationMessageFor(model => model.IsAvailable)
+            </div>
+        </div>
+
+        <div class="form-group">
             <div class="col-md-offset-2 col-md-10">
                 <input type="submit" value="Save" class="btn btn-default" />
             </div>

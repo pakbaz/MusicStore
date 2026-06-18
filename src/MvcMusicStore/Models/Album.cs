@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
@@ -53,9 +54,18 @@ namespace MvcMusicStore.Models
             {
                 return AlbumArtUrl;
             }
-
             return DefaultPlaceholderThumbnailUrl;
         }
+        }
+        [DisplayName("Featured Release")]
+        public bool IsFeatured { get; set; }
+        public bool IsFeatured { get; set; }
+        [DataType(DataType.Date)]
+        public DateTime? ReleaseDate { get; set; }
+        public DateTime? ReleaseDate { get; set; }
+        [DisplayName("Available")]
+        public bool IsAvailable { get; set; } = true;
+        public bool IsAvailable { get; set; } = true;
 
         public virtual Genre? Genre { get; set; }
         public virtual Artist? Artist { get; set; }

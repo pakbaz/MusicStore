@@ -58,7 +58,6 @@ namespace MvcMusicStore.Controllers
                 .Include(a => a.Artist)
                 .Include(a => a.Genre)
                 .SingleOrDefaultAsync(a => a.AlbumId == id);
-
             if (album == null)
             {
                 return NotFound();
@@ -172,7 +171,10 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Delete(int id = 0)
         {
-            Album? album = await db.Albums.FindAsync(id);
+            Album? album = await db.Albums
+                .Include(a => a.Artist)
+                .Include(a => a.Genre)
+                .SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();

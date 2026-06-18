@@ -9,9 +9,9 @@
     <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
 }
 
-@using (Html.BeginForm())
+@using (Html.BeginForm(null, null, FormMethod.Post, new { aria_label = "Checkout address and payment form" }))
 {
-    @Html.ValidationSummary(true, string.Empty, new { @class = "text-danger" })
+    @Html.ValidationSummary(true, string.Empty, new { @class = "text-danger", role = "alert" })
 
     <h2>Address And Payment</h2>
     <fieldset class="form-horizontal">
@@ -97,7 +97,7 @@
         <div class="form-group">
             @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
             <div class="col-md-6">
-                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code" })
+                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code", autocomplete = "off" })
                 @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
             </div>
         </div>
