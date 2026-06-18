@@ -38,6 +38,9 @@
         <th>
             @Html.DisplayNameFor(model => model.IsAvailable)
         </th>
+        <th>
+            @Html.DisplayNameFor(model => model.IsFeatured)
+        </th>
         <th></th>
     </tr>
 
@@ -61,6 +64,9 @@
             </td>
             <td>
                 @(item.IsAvailable ? "Yes" : "No")
+            </td>
+            <td>
+                @(item.IsFeatured ? "Yes" : "No")
             </td>
             <td>
                 @Html.ActionLink("Edit", "Edit", new { id = item.AlbumId }) |

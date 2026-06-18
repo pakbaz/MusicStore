@@ -1,4 +1,6 @@
-﻿@{
+﻿@model MvcMusicStore.ViewModels.HomeIndexViewModel
+
+@{
     ViewBag.Title = "Home Page";
 }
 
@@ -20,17 +22,60 @@
 
 <section class="content-section">
     <div class="section-heading">
-        <h2>Top selling albums</h2>
+        <h2>Featured releases</h2>
         <a class="section-link" href="@Url.Action("Index", "Store")">View all genres</a>
     </div>
     <div class="album-grid">
-    @foreach (var album in Model)
+    @foreach (var album in Model.FeaturedReleases)
     {
         <article class="album-card">
             <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
                 <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
                 <div class="album-card-body">
                     <h3 class="album-title">@album.Title</h3>
+                    <p class="album-price">@album.Artist?.Name</p>
+                </div>
+            </a>
+        </article>
+    }
+    </div>
+</section>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Trending now</h2>
+        <a class="section-link" href="@Url.Action("Index", "Store")">Browse genres</a>
+    </div>
+    <div class="album-grid">
+    @foreach (var album in Model.TrendingReleases)
+    {
+        <article class="album-card">
+            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                <div class="album-card-body">
+                    <h3 class="album-title">@album.Title</h3>
+                    <p class="album-price">@album.Price.ToString("C")</p>
+                </div>
+            </a>
+        </article>
+    }
+    </div>
+</section>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h2>Curated picks</h2>
+        <a class="section-link" href="@Url.Action("Index", "Store")">See catalog</a>
+    </div>
+    <div class="album-grid">
+    @foreach (var album in Model.CuratedReleases)
+    {
+        <article class="album-card">
+            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                <div class="album-card-body">
+                    <h3 class="album-title">@album.Title</h3>
+                    <p class="album-price">@album.Artist?.Name</p>
                 </div>
             </a>
         </article>
