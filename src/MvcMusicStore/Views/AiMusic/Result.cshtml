@@ -1,0 +1,26 @@
+@model MvcMusicStore.ViewModels.AiMusicGenerationResultViewModel
+
+@{
+    ViewBag.Title = "Generated Track Ready";
+}
+
+<h2>Generated Track Ready</h2>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>@Model.Title</strong></div>
+    <div class="panel-body">
+        <p><strong>Artist:</strong> @Model.ArtistName</p>
+        <p><strong>Genre:</strong> @Model.Genre</p>
+        <p><strong>Style direction:</strong> @Model.StyleDirection</p>
+        <p><strong>Mood:</strong> @Model.Mood</p>
+        <p><strong>Instrumentation:</strong> @Model.Instrumentation</p>
+        <p><strong>Tempo:</strong> @Model.TempoBpm BPM</p>
+        <p><strong>Price:</strong> @Model.SuggestedPrice.ToString("C")</p>
+        <p class="alert alert-info">@Model.OriginalityStatement</p>
+    </div>
+</div>
+
+<p>
+    @Html.ActionLink("View in Store", "Details", "Store", new { id = Model.AlbumId }, new { @class = "btn btn-success" })
+    @Html.ActionLink("Generate Another", "Index", "AiMusic", null, new { @class = "btn btn-default" })
+</p>
