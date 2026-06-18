@@ -10,7 +10,7 @@
         @Html.ActionLink("Hi, " + User.Identity.Name, "Manage", "Account", routeValues: null, htmlAttributes: new { title = "Manage" })
     </li>
     <li>
-        <a href="#" onclick="document.getElementById('logoutForm').submit(); return false;">Log off</a>
+        <button type="submit" form="logoutForm" class="btn btn-link navbar-btn nav-link-button">Log off</button>
     </li>
 }
 else

@@ -93,7 +93,7 @@
     <div class="alert alert-info">@ViewBag.CartMessage</div>
 }
 
-<div id="update-message" class="alert alert-info hidden"></div>
+<div id="update-message" class="alert alert-info hidden" role="status" aria-live="polite"></div>
 
 <div id="empty-cart-state" class="@(hasItems ? "hidden" : string.Empty)">
     <div class="jumbotron">
@@ -107,18 +107,19 @@
 
 <div id="cart-table-wrapper" class="@(hasItems ? string.Empty : "hidden")">
     <p>
-        <a class="btn btn-primary" href="@Url.Action("AddressAndPayment", "Checkout")">Proceed to checkout</a>
+        <a class="btn btn-primary" href="@Url.Action("AddressAndPayment", "Checkout")" aria-label="Proceed to checkout">Proceed to checkout</a>
         <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
     </p>
 
     <table id="cart-summary-table" class="table table-striped table-bordered">
+        <caption class="sr-only">Items in your shopping cart</caption>
         <thead>
             <tr>
-                <th>Album</th>
-                <th class="text-right">Unit price</th>
-                <th>Quantity</th>
-                <th class="text-right">Subtotal</th>
-                <th>Actions</th>
+                <th scope="col">Album</th>
+                <th scope="col" class="text-right">Unit price</th>
+                <th scope="col">Quantity</th>
+                <th scope="col" class="text-right">Subtotal</th>
+                <th scope="col">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -133,18 +134,18 @@
                     <td>
                         <div class="input-group cart-quantity-group">
                             <span class="input-group-btn">
-                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="-1">-</button>
+                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="-1" aria-label="Decrease quantity for @item.Album!.Title">-</button>
                             </span>
-                            <input id="quantity-input-@item.RecordId" class="form-control cart-quantity-input" type="number" min="0" value="@item.Count" />
+                            <input id="quantity-input-@item.RecordId" class="form-control cart-quantity-input" type="number" min="0" value="@item.Count" aria-label="Quantity for @item.Album!.Title" />
                             <span class="input-group-btn">
-                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="1">+</button>
+                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="1" aria-label="Increase quantity for @item.Album!.Title">+</button>
                             </span>
                         </div>
                     </td>
                     <td id="item-subtotal-@item.RecordId" class="text-right">@lineSubtotal.ToString("C")</td>
                     <td>
-                        <button type="button" class="btn btn-default js-update" data-id="@item.RecordId">Update</button>
-                        <button type="button" class="btn btn-link js-remove" data-id="@item.RecordId">Remove</button>
+                        <button type="button" class="btn btn-default js-update" data-id="@item.RecordId" aria-label="Update quantity for @item.Album!.Title">Update</button>
+                        <button type="button" class="btn btn-link js-remove" data-id="@item.RecordId" aria-label="Remove @item.Album!.Title from cart">Remove</button>
                     </td>
                 </tr>
             }
