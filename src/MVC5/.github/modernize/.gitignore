@@ -1,1 +1,4 @@
-*!assessment/
+*
+!assessment/
+!upgrade-to-lts-*/
+!upgrade-to-lts-*/**

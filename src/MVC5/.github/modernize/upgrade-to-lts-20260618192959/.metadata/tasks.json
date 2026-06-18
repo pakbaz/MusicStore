@@ -1,0 +1,33 @@
+{
+  "$schema": "tasks-schema.json",
+  "description": ".NET package upgrade plan from ASP.NET Core / EF Core 9.0.0 to 10.0.x (net10.0 LTS)",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-dotnet-to-net10",
+      "description": "Upgrade MvcMusicStore NuGet packages to .NET 10 LTS (net10.0)",
+      "reason": "The project targets net10.0 but all Microsoft.AspNetCore.* and Microsoft.EntityFrameworkCore.* NuGet packages are pinned to version 9.0.0. This mismatch means the project is not fully running on .NET 10 LTS. The user has explicitly requested an upgrade to the latest LTS versions, and aligning packages with the target framework ensures long-term support, access to .NET 10 APIs, and compatibility with net10.0 runtime improvements.",
+      "requirements": "Upgrade the MvcMusicStore project from package versions 9.0.0 to 10.0.x for all Microsoft.AspNetCore.* and Microsoft.EntityFrameworkCore.* packages. The TargetFramework is already net10.0 and should remain unchanged. Resolve any API breaking changes or deprecations between EF Core 9 and EF Core 10. Ensure the project compiles and all existing unit tests pass after the package upgrade.",
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      },
+      "status": "success",
+      "summary": "Upgraded Microsoft.AspNetCore.Identity.EntityFrameworkCore, Microsoft.EntityFrameworkCore.SqlServer, and Microsoft.EntityFrameworkCore.Tools from 9.0.0 to 10.0.9. TargetFramework remains net10.0. No API breaking changes. Build succeeded with 0 errors.",
+      "successCriteriaStatus": {
+        "passBuild": "true",
+        "generateNewUnitTests": "false",
+        "passUnitTests": "true"
+      }
+    }
+  ],
+  "metadata": {
+    "planName": "upgrade-to-lts",
+    "projectName": "MvcMusicStore",
+    "language": "dotnet",
+    "createdAt": "2026-06-18T19:29:59.000Z",
+    "version": "1.0"
+  }
+}
