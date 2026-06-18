@@ -14,7 +14,13 @@
         "generateNewUnitTests": "false",
         "passUnitTests": "true"
       },
-      "status": "started"
+      "status": "success",
+      "summary": "Successfully upgraded MvcMusicStore from .NET Framework 4.8 to .NET 10.0. Converted project to SDK-style, migrated ASP.NET MVC 5 to ASP.NET Core MVC, replaced OWIN/Katana with ASP.NET Core middleware, upgraded ASP.NET Identity 1.x to ASP.NET Core Identity, migrated EF6 to EF Core, replaced Web.config with appsettings.json, added View Components for child actions, and updated all NuGet packages. Build succeeded with 0 errors.",
+      "successCriteriaStatus": {
+        "passBuild": true,
+        "generateNewUnitTests": false,
+        "passUnitTests": true
+      }
     }
   ],
   "metadata": {
