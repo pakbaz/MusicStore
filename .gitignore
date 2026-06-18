@@ -32,3 +32,6 @@ build/
 App_Data/
 Packages/
 .vs/
+*.db
+*.db-shm
+*.db-wal

@@ -1,6 +1,6 @@
 # MVC Music Store
 
-*This contains forks of the MVC 3, MVC 4, and MVC 5 versions of the MVC Music Store sample application, built for the .NET Framework. It is intended for illustration purposes. For new applications, we recommend you use modern .NET!*
+*This repository now focuses on the upgraded ASP.NET Core version of the MVC Music Store sample application, running on .NET 10. It is intended for illustration purposes. For new applications, we recommend using modern .NET!*
 
 <img src="https://github.com/user-attachments/assets/5aa786f5-6540-4baf-963e-2303518b0e78" alt="MVC Music Store application interface showing the homepage with featured albums">
 
@@ -10,18 +10,20 @@ The MVC Music Store is a tutorial application that introduces and explains step-
 
 The MVC Music Store is a lightweight sample store implementation which sells music albums online, and implements basic site administration, user sign-in, and shopping cart functionality.
 
-This tutorial series details all of the steps taken to build the ASP.NET MVC Music Store sample application.
+This repository now contains the upgraded application under [src/MvcMusicStore](src/MvcMusicStore).
 
-## Version-Specific Documentation
+## Running the App
 
-This repository contains three different versions of the MVC Music Store application:
+From the repository root:
 
-- **[MVC 3](src/MVC3/readme.txt)** - Original version for ASP.NET MVC 3 Tools Update
-- **[MVC 4](src/MVC4/README.md)** - Updated version for ASP.NET MVC 4
-- **[MVC 5](src/MVC5/README.md)** - Latest version for ASP.NET MVC 5
+```bash
+dotnet build src/MvcMusicStore/MvcMusicStore.csproj
+cd src/MvcMusicStore
+ASPNETCORE_URLS=http://127.0.0.1:5090 dotnet run
+```
 
-Each version includes detailed setup instructions, prerequisites, and troubleshooting information in its respective README file.
+The app will start on http://127.0.0.1:5090/.
 
 ## Additional Resources
 
-MVC 3 archive retrieved from [mvcmusicstore.codeplex.com on the Internet Archive](https://web.archive.org/web/20210423041527/https://archive.codeplex.com/?p=mvcmusicstore). Tutorial documentation is available on [Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/mvc/overview/older-versions/mvc-music-store/).
+Tutorial documentation is available on [Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/mvc/overview/older-versions/mvc-music-store/).
