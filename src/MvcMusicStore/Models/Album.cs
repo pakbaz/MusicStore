@@ -6,6 +6,8 @@ using System.ComponentModel.DataAnnotations;
 namespace MvcMusicStore.Models
 {
     public class Album {
+        public const string DefaultPlaceholderThumbnailUrl = "~/Images/placeholder.png";
+
         [ScaffoldColumn(false)]
 
         public int AlbumId { get; set; }
@@ -28,13 +30,41 @@ namespace MvcMusicStore.Models
         [StringLength(1024)]
         public string? AlbumArtUrl { get; set; }
 
+        [DisplayName("Metadata Thumbnail URL")]
+        [StringLength(1024)]
+        public string? MetadataThumbnailUrl { get; set; }
+
+        [DisplayName("Uploaded Thumbnail URL")]
+        [StringLength(1024)]
+        public string? UploadedThumbnailUrl { get; set; }
+
+        public string GetDisplayThumbnailUrl()
+        {
+            if (!string.IsNullOrWhiteSpace(UploadedThumbnailUrl))
+            {
+                return UploadedThumbnailUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(MetadataThumbnailUrl))
+            {
+                return MetadataThumbnailUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(AlbumArtUrl))
+            {
+                return AlbumArtUrl;
+            }
+            return DefaultPlaceholderThumbnailUrl;
+        }
+        }
         [DisplayName("Featured Release")]
         public bool IsFeatured { get; set; }
-
+        public bool IsFeatured { get; set; }
         [DataType(DataType.Date)]
         public DateTime? ReleaseDate { get; set; }
-
+        public DateTime? ReleaseDate { get; set; }
         [DisplayName("Available")]
+        public bool IsAvailable { get; set; } = true;
         public bool IsAvailable { get; set; } = true;
 
         public virtual Genre? Genre { get; set; }

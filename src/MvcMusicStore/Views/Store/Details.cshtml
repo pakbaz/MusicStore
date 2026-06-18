@@ -6,7 +6,7 @@
 
 <article class="album-detail">
     <div class="album-detail-art">
-        <img alt="@Model.Album.Title" src="@Url.Content(Model.Album.AlbumArtUrl)" />
+        <img alt="@Model.Album.Title" src="@Url.Content(Model.Album.GetDisplayThumbnailUrl())" />
     </div>
     <div class="album-detail-content">
         <p class="detail-kicker">@Model.Album.Genre!.Name</p>
@@ -44,7 +44,7 @@
         {
             <article class="album-card">
                 <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
                     <div class="album-card-body">
                         <h3 class="album-title">@album.Title</h3>
                         <p class="album-price">@album.Artist?.Name</p>
@@ -71,7 +71,7 @@
         {
             <article class="album-card">
                 <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                    <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                    <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
                     <div class="album-card-body">
                         <h3 class="album-title">@album.Title</h3>
                         <p class="album-price">@album.Genre?.Name</p>

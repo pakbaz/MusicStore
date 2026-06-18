@@ -532,6 +532,21 @@ input[type="checkbox"].input-validation-error {
     max-width: 170px;
 }
 
+.admin-thumbnail-list {
+    max-width: 48px;
+    max-height: 48px;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
+.admin-thumbnail-preview {
+    max-width: 160px;
+    max-height: 160px;
+    object-fit: cover;
+    border-radius: 2px;
+    box-shadow: 1px 1px 5px #999;
+}
+
 .cart-quantity-input {
     min-width: 60px;
     text-align: center;

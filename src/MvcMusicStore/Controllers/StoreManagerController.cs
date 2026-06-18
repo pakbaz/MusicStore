@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Controllers
 {
@@ -13,31 +14,50 @@ namespace MvcMusicStore.Controllers
     public class StoreManagerController : Controller
     {
         private readonly MusicStoreEntities db;
+        private readonly IAlbumArtworkService albumArtworkService;
+        private readonly IWebHostEnvironment environment;
+        private readonly ILogger<StoreManagerController> logger;
 
-        public StoreManagerController(MusicStoreEntities storeDb)
+        private static readonly HashSet<string> AllowedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp"
+        };
+
+        public StoreManagerController(
+            MusicStoreEntities storeDb,
+            IAlbumArtworkService albumArtworkService,
+            IWebHostEnvironment environment,
+            ILogger<StoreManagerController> logger)
         {
             db = storeDb;
+            this.albumArtworkService = albumArtworkService;
+            this.environment = environment;
+            this.logger = logger;
         }
 
         //
         // GET: /StoreManager/
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             var albums = db.Albums.Include(a => a.Genre).Include(a => a.Artist)
                 .OrderBy(a => a.Price);
-            return View(albums.ToList());
+            return View(await albums.ToListAsync());
         }
 
         //
         // GET: /StoreManager/Details/5
 
-        public IActionResult Details(int id = 0)
+        public async Task<IActionResult> Details(int id = 0)
         {
-            Album? album = db.Albums
+            Album? album = await db.Albums
                 .Include(a => a.Artist)
                 .Include(a => a.Genre)
-                .SingleOrDefault(a => a.AlbumId == id);
+                .SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
@@ -59,12 +79,23 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Create
 
         [HttpPost]
-        public IActionResult Create(Album album)
+        public async Task<IActionResult> Create(Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
         {
+            ValidateThumbnailFile(thumbnailFile);
+
             if (ModelState.IsValid)
             {
+                if (thumbnailFile is { Length: > 0 })
+                {
+                    album.UploadedThumbnailUrl = await SaveUploadedThumbnailAsync(thumbnailFile, cancellationToken);
+                }
+                else if (string.IsNullOrWhiteSpace(album.AlbumArtUrl))
+                {
+                    album.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(album.ArtistId, album.Title, cancellationToken);
+                }
+
                 db.Albums.Add(album);
-                db.SaveChanges();
+                await db.SaveChangesAsync(cancellationToken);
                 return RedirectToAction("Index");
             }
 
@@ -76,9 +107,9 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /StoreManager/Edit/5
 
-        public IActionResult Edit(int id = 0)
+        public async Task<IActionResult> Edit(int id = 0)
         {
-            Album? album = db.Albums.Find(id);
+            Album? album = await db.Albums.FindAsync(id);
             if (album == null)
             {
                 return NotFound();
@@ -92,14 +123,44 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Edit/5
 
         [HttpPost]
-        public IActionResult Edit(Album album)
+        public async Task<IActionResult> Edit(int id, Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
         {
+            if (id != album.AlbumId)
+            {
+                return BadRequest();
+            }
+
+            var existingAlbum = await db.Albums.FindAsync(id);
+            if (existingAlbum == null)
+            {
+                return NotFound();
+            }
+
+            ValidateThumbnailFile(thumbnailFile);
+
             if (ModelState.IsValid)
             {
-                db.Entry(album).State = EntityState.Modified;
-                db.SaveChanges();
+                existingAlbum.GenreId = album.GenreId;
+                existingAlbum.ArtistId = album.ArtistId;
+                existingAlbum.Title = album.Title;
+                existingAlbum.Price = album.Price;
+                existingAlbum.AlbumArtUrl = album.AlbumArtUrl;
+
+                if (thumbnailFile is { Length: > 0 })
+                {
+                    existingAlbum.UploadedThumbnailUrl = await SaveUploadedThumbnailAsync(thumbnailFile, cancellationToken);
+                }
+                else if (string.IsNullOrWhiteSpace(existingAlbum.UploadedThumbnailUrl) &&
+                         string.IsNullOrWhiteSpace(existingAlbum.MetadataThumbnailUrl) &&
+                         string.IsNullOrWhiteSpace(existingAlbum.AlbumArtUrl))
+                {
+                    existingAlbum.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(existingAlbum.ArtistId, existingAlbum.Title, cancellationToken);
+                }
+
+                await db.SaveChangesAsync(cancellationToken);
                 return RedirectToAction("Index");
             }
+
             ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Genres, "GenreId", "Name", album.GenreId);
             ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Artists, "ArtistId", "Name", album.ArtistId);
             return View(album);
@@ -108,12 +169,12 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /StoreManager/Delete/5
 
-        public IActionResult Delete(int id = 0)
+        public async Task<IActionResult> Delete(int id = 0)
         {
-            Album? album = db.Albums
+            Album? album = await db.Albums
                 .Include(a => a.Artist)
                 .Include(a => a.Genre)
-                .SingleOrDefault(a => a.AlbumId == id);
+                .SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
@@ -125,15 +186,88 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Delete/5
 
         [HttpPost, ActionName("Delete")]
-        public IActionResult DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int id, CancellationToken cancellationToken)
         {
-            Album? album = db.Albums.Find(id);
+            Album? album = await db.Albums.FindAsync(id);
             if (album != null)
             {
                 db.Albums.Remove(album);
-                db.SaveChanges();
+                await db.SaveChangesAsync(cancellationToken);
             }
             return RedirectToAction("Index");
+        }
+
+        private static string ResolveImageExtension(IFormFile thumbnailFile)
+        {
+            var extension = Path.GetExtension(thumbnailFile.FileName);
+            return string.IsNullOrWhiteSpace(extension) ? string.Empty : extension;
+        }
+
+        private void ValidateThumbnailFile(IFormFile? thumbnailFile)
+        {
+            if (thumbnailFile is null || thumbnailFile.Length == 0)
+            {
+                return;
+            }
+
+            var extension = ResolveImageExtension(thumbnailFile);
+            if (!AllowedImageExtensions.Contains(extension))
+            {
+                ModelState.AddModelError(nameof(thumbnailFile), "Upload a valid image file (.png, .jpg, .jpeg, .gif, .webp).");
+            }
+
+            if (!thumbnailFile.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError(nameof(thumbnailFile), "Upload a valid image content type.");
+            }
+        }
+
+        private async Task<string> SaveUploadedThumbnailAsync(IFormFile thumbnailFile, CancellationToken cancellationToken)
+        {
+            var extension = ResolveImageExtension(thumbnailFile);
+            var uploadsDirectory = Path.Combine(environment.ContentRootPath, "Images", "Uploads");
+            Directory.CreateDirectory(uploadsDirectory);
+
+            var fileName = $"{Guid.NewGuid():N}{extension}";
+            var outputPath = Path.Combine(uploadsDirectory, fileName);
+
+            await using var outputStream = System.IO.File.Create(outputPath);
+            await thumbnailFile.CopyToAsync(outputStream, cancellationToken);
+
+            return $"~/Images/Uploads/{fileName}";
+        }
+
+        private async Task<string?> TryFetchMetadataThumbnailAsync(int artistId, string? albumTitle, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(albumTitle))
+            {
+                return null;
+            }
+
+            var artistName = await db.Artists
+                .Where(artist => artist.ArtistId == artistId)
+                .Select(artist => artist.Name)
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(artistName))
+            {
+                return null;
+            }
+
+            try
+            {
+                return await albumArtworkService.TryGetThumbnailUrlAsync(artistName, albumTitle, cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogWarning(ex, "Unable to fetch metadata artwork for album '{AlbumTitle}' by '{ArtistName}'.", albumTitle, artistName);
+                return null;
+            }
+            catch (TaskCanceledException ex)
+            {
+                logger.LogWarning(ex, "Timed out while fetching metadata artwork for album '{AlbumTitle}' by '{ArtistName}'.", albumTitle, artistName);
+                return null;
+            }
         }
     }
 }

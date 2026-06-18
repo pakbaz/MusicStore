@@ -13,14 +13,7 @@
         {
             <article class="album-card">
                 <a class="album-card-link" href="@Url.Action("Details", new { id = album.AlbumId })">
-                    @if (!string.IsNullOrEmpty(album.AlbumArtUrl))
-                    {
-                        <img alt="@album.Title" src="@Url.Content(@album.AlbumArtUrl)" />
-                    }
-                    else
-                    {
-                        <img alt="@album.Title" src="~/Images/placeholder.png" />
-                    }
+                    <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
                     <div class="album-card-body">
                         <h3 class="album-title">@album.Title</h3>
                         <p class="album-price">@album.Price.ToString("C")</p>

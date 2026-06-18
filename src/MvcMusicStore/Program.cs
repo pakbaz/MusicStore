@@ -7,6 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddHttpClient<IAlbumArtworkService, MusicBrainzAlbumArtworkService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // Add Entity Framework - Music Store
 builder.Services.AddDbContext<MusicStoreEntities>(options =>

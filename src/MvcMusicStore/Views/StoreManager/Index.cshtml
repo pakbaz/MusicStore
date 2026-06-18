@@ -41,6 +41,7 @@
         <th>
             @Html.DisplayNameFor(model => model.IsFeatured)
         </th>
+        <th>Thumbnail</th>
         <th></th>
     </tr>
 
@@ -67,6 +68,9 @@
             </td>
             <td>
                 @(item.IsFeatured ? "Yes" : "No")
+            </td>
+            <td>
+                <img alt="@item.Title thumbnail" src="@Url.Content(item.GetDisplayThumbnailUrl())" class="admin-thumbnail-list" />
             </td>
             <td>
                 @Html.ActionLink("Edit", "Edit", new { id = item.AlbumId }) |

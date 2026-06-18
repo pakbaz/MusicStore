@@ -30,7 +30,7 @@
     {
         <article class="album-card">
             <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" />
                 <div class="album-card-body">
                     <h3 class="album-title">@album.Title</h3>
                     <p class="album-price">@album.Artist?.Name</p>
