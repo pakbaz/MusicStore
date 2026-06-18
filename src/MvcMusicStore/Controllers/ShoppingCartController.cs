@@ -28,6 +28,8 @@ namespace MvcMusicStore.Controllers
                 CartTotal = cart.GetTotal()
             };
 
+            ViewBag.CartMessage = TempData["CartMessage"];
+
             // Return the view
             return View(viewModel);
         }
@@ -62,30 +64,79 @@ namespace MvcMusicStore.Controllers
             // Retrieve the current user's shopping cart
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
-            // Get the name of the album to display confirmation
-            string albumName = storeDB.Carts
-                .Single(item => item.RecordId == id).Album!.Title!;
+            var cartItem = cart.GetCartItems().SingleOrDefault(item => item.RecordId == id);
+            if (cartItem == null)
+            {
+                return NotFound("Cart item not found.");
+            }
+
+            var albumName = cartItem.Album?.Title ?? "This album";
 
             // Remove from cart
             int itemCount = cart.RemoveFromCart(id);
 
             storeDB.SaveChanges();
 
-            string removed = (itemCount > 0) ? " 1 copy of " : string.Empty;
+            var itemSubtotal = itemCount > 0
+                ? (cartItem.Album?.Price ?? decimal.Zero) * itemCount
+                : decimal.Zero;
 
-            // Display the confirmation message
+            var message = itemCount > 0
+                ? $"1 copy of {albumName} has been removed from your shopping cart."
+                : $"{albumName} has been removed from your shopping cart.";
 
-            var results = new ShoppingCartRemoveViewModel
+            return Json(BuildCartResponse(cart, id, itemCount, itemSubtotal, message));
+        }
+
+        [HttpPost]
+        public IActionResult UpdateCart(int id, int count)
+        {
+            if (count < 0)
             {
-                Message = removed + albumName +
-                    " has been removed from your shopping cart.",
+                return BadRequest("Quantity cannot be negative.");
+            }
+
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            var cartItem = cart.GetCartItems().SingleOrDefault(item => item.RecordId == id);
+
+            if (cartItem == null)
+            {
+                return NotFound("Cart item not found.");
+            }
+
+            var albumName = cartItem.Album?.Title ?? "This album";
+            var unitPrice = cartItem.Album?.Price ?? decimal.Zero;
+            var itemCount = cart.UpdateCartItemCount(id, count);
+
+            storeDB.SaveChanges();
+
+            var itemSubtotal = unitPrice * itemCount;
+            var message = itemCount == 0
+                ? $"{albumName} has been removed from your shopping cart."
+                : $"{albumName} quantity has been updated to {itemCount}.";
+
+            return Json(BuildCartResponse(cart, id, itemCount, itemSubtotal, message));
+        }
+
+        private ShoppingCartRemoveViewModel BuildCartResponse(ShoppingCart cart, int id, int itemCount, decimal itemSubtotal, string message)
+        {
+            var cartItems = cart.GetCartItems()
+                .Where(item => item.Album != null)
+                .OrderBy(item => item.Album!.Title)
+                .ToList();
+
+            var cartSummary = string.Join("\n", cartItems.Select(item => $"{item.Album!.Title} x{item.Count}"));
+
+            return new ShoppingCartRemoveViewModel
+            {
+                Message = message,
                 CartTotal = cart.GetTotal(),
                 CartCount = cart.GetCount(),
                 ItemCount = itemCount,
+                ItemSubtotal = itemSubtotal,
+                CartSummary = cartSummary,
                 DeleteId = id
             };
-
-            return Json(results);
         }
     }
 }

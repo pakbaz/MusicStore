@@ -3,5 +3,9 @@
 }
 
 <h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
+<h2 class="text-danger">@((ViewBag.ErrorMessage as string) ?? "An error occurred while processing your request.")</h2>
 
+<p>
+    <a class="btn btn-default" href="@Url.Action("Index", "ShoppingCart")">Back to cart</a>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Browse music</a>
+</p>

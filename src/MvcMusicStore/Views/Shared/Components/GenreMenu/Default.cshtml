@@ -1,13 +1,11 @@
 @model IEnumerable<MvcMusicStore.Models.Genre>
 
-<li class="dropdown">
+<li class="dropdown genre-dropdown">
     <a href="@Url.Action("Index", "Store")"
        class="dropdown-toggle"
        data-toggle="dropdown"
        aria-haspopup="true"
-       aria-expanded="false">
-        Store <b class="caret" aria-hidden="true"></b>
-    </a>
+       aria-expanded="false">Genres <b class="caret" aria-hidden="true"></b></a>
     <ul class="dropdown-menu">
         @foreach (var genre in Model)
         {
