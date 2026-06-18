@@ -409,3 +409,12 @@ input[type="checkbox"].input-validation-error {
         display: list-item;
     }
 }
+
+.cart-quantity-group {
+    max-width: 170px;
+}
+
+.cart-quantity-input {
+    min-width: 60px;
+    text-align: center;
+}
