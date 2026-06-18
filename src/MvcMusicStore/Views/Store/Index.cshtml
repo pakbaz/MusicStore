@@ -1,20 +1,92 @@
-﻿@model IEnumerable<MvcMusicStore.Models.Genre>
+﻿@model MvcMusicStore.ViewModels.CatalogIndexViewModel
 @{
-    ViewBag.Title = "Browse Genres";
+    ViewBag.Title = "Store Catalog";
 }
 
-<section class="content-section" aria-label="Genre catalog">
-    <div class="section-heading">
-        <h1>Browse genres</h1>
-        <p class="section-subtitle">Pick from @Model.Count() genres and jump straight to the albums you love.</p>
-    </div>
-    <div class="genre-grid">
-    @foreach (var genre in Model)
+<section class="content-section" aria-label="Store catalog filters">
+    <h1>Catalog</h1>
+    @using (Html.BeginForm("Index", "Store", FormMethod.Get, new { @class = "form-inline", role = "search", aria_label = "Filter catalog" }))
     {
-        <a class="genre-card" href="@Url.Action("Browse", new { genre = genre.Name })">
-            <span class="genre-name">@genre.Name</span>
-            <span class="genre-action">Explore</span>
-        </a>
+        <div class="form-group">
+            <label class="sr-only" for="search">Search</label>
+            <input class="form-control" id="search" name="search" placeholder="Album, artist, or genre" type="text" value="@Model.Search" />
+        </div>
+        <div class="form-group">
+            <label class="sr-only" for="genre">Genre</label>
+            <select class="form-control" id="genre" name="genre">
+                <option value="">All genres</option>
+                @foreach (var genre in Model.Genres)
+                {
+                    <option value="@genre" selected="@(Model.Genre == genre)">@genre</option>
+                }
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="sr-only" for="minPrice">Min price</label>
+            <input class="form-control" id="minPrice" min="0" name="minPrice" placeholder="Min price" step="0.01" type="number" value="@Model.MinPrice" />
+        </div>
+        <div class="form-group">
+            <label class="sr-only" for="maxPrice">Max price</label>
+            <input class="form-control" id="maxPrice" min="0" name="maxPrice" placeholder="Max price" step="0.01" type="number" value="@Model.MaxPrice" />
+        </div>
+        <div class="form-group">
+            <label class="sr-only" for="availability">Availability</label>
+            <select class="form-control" id="availability" name="availability">
+                <option value="all" selected="@(Model.Availability == "all")">All availability</option>
+                <option value="available" selected="@(Model.Availability == "available")">In stock</option>
+                <option value="unavailable" selected="@(Model.Availability == "unavailable")">Out of stock</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="sr-only" for="sort">Sort</label>
+            <select class="form-control" id="sort" name="sort">
+                <option value="popularity_desc" selected="@(Model.Sort == "popularity_desc")">Popularity</option>
+                <option value="release_desc" selected="@(Model.Sort == "release_desc")">Release date (newest)</option>
+                <option value="release_asc" selected="@(Model.Sort == "release_asc")">Release date (oldest)</option>
+                <option value="price_asc" selected="@(Model.Sort == "price_asc")">Price (low to high)</option>
+                <option value="price_desc" selected="@(Model.Sort == "price_desc")">Price (high to low)</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Apply</button>
+        <a class="btn btn-link" href="@Url.Action("Index", "Store")">Clear filters</a>
     }
-    </div>
+</section>
+
+<section class="content-section" aria-label="Catalog results">
+    <p class="text-muted">
+        @Model.TotalResults result(s)
+    </p>
+
+    @if (!Model.Albums.Any())
+    {
+        <div class="alert alert-info">
+            No albums match the current search and filter combination.
+        </div>
+    }
+    else
+    {
+        <ul id="album-list" class="row list-unstyled">
+            @foreach (var album in Model.Albums)
+            {
+                <li class="col-lg-2 col-md-3 col-sm-4 col-xs-6 container">
+                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <h2 class="h5 control-label">@album.Title</h2>
+                    </a>
+                    <small class="text-muted">@album.ArtistName</small><br />
+                    <small class="text-muted">@album.GenreName</small><br />
+                    <small class="text-muted">@album.Price.ToString("C")</small><br />
+                    <small class="text-muted">Released: @(album.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</small><br />
+                    @if (album.IsAvailable)
+                    {
+                        <span class="label label-success">In stock</span>
+                    }
+                    else
+                    {
+                        <span class="label label-default">Out of stock</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
 </section>

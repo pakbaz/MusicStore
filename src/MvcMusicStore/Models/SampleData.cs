@@ -18,8 +18,22 @@ namespace MvcMusicStore.Models
             var genres = AddGenres(context);
             var artists = AddArtists(context);
             AddAlbums(context, imgUrl, genres, artists);
+            AddAlbumCatalogMetadata(context);
 
             await context.SaveChangesAsync();
+        }
+
+        private static void AddAlbumCatalogMetadata(MusicStoreEntities context)
+        {
+            var random = new Random(1978);
+            var startDate = new DateTime(1990, 1, 1);
+            var maxDays = (DateTime.UtcNow.Date - startDate).Days;
+
+            foreach (var album in context.Albums.Local)
+            {
+                album.ReleaseDate = startDate.AddDays(random.Next(0, maxDays));
+                album.IsAvailable = random.NextDouble() >= 0.15;
+            }
         }
 
         private static void AddAlbums(MusicStoreEntities context, string imgUrl, List<Genre> genres, List<Artist> artists)

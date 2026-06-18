@@ -43,6 +43,22 @@
         </dd>
 
         <dt>
+            @Html.DisplayNameFor(model => model.ReleaseDate)
+        </dt>
+
+        <dd>
+            @(Model.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.IsAvailable)
+        </dt>
+
+        <dd>
+            @(Model.IsAvailable ? "Yes" : "No")
+        </dd>
+
+        <dt>
             @Html.DisplayNameFor(model => model.AlbumArtUrl)
         </dt>
 
