@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
@@ -26,6 +27,12 @@ namespace MvcMusicStore.Models
         [DisplayName("Album Art URL")]
         [StringLength(1024)]
         public string? AlbumArtUrl { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? ReleaseDate { get; set; }
+
+        [DisplayName("Available")]
+        public bool IsAvailable { get; set; } = true;
 
         public virtual Genre? Genre { get; set; }
         public virtual Artist? Artist { get; set; }
