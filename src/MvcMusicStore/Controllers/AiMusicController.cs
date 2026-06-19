@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
@@ -65,6 +66,10 @@ namespace MvcMusicStore.Controllers
             {
                 ModelState.AddModelError(nameof(model.GenreId), "Please choose a valid genre.");
             }
+
+            ValidateSelection(ModelState, model.StyleDirection, StyleDirections, nameof(model.StyleDirection), "Please choose a valid style direction.");
+            ValidateSelection(ModelState, model.Mood, MoodOptions, nameof(model.Mood), "Please choose a valid mood.");
+            ValidateSelection(ModelState, model.Instrumentation, InstrumentationOptions, nameof(model.Instrumentation), "Please choose valid instrumentation.");
 
             if (!ModelState.IsValid)
             {
@@ -147,6 +152,19 @@ namespace MvcMusicStore.Controllers
                     Selected = string.Equals(v, selectedValue, StringComparison.Ordinal)
                 })
                 .ToList();
+        }
+
+        private static void ValidateSelection(ModelStateDictionary modelState, string? value, IEnumerable<string> validValues, string key, string errorMessage)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            if (!validValues.Contains(value, StringComparer.Ordinal))
+            {
+                modelState.AddModelError(key, errorMessage);
+            }
         }
     }
 }

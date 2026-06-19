@@ -10,16 +10,13 @@ namespace MvcMusicStore.ViewModels
         public int GenreId { get; set; }
 
         [Required]
-        [StringLength(80, MinimumLength = 2)]
         [Display(Name = "Style direction")]
         public string? StyleDirection { get; set; }
 
         [Required]
-        [StringLength(80, MinimumLength = 2)]
         public string? Mood { get; set; }
 
         [Required]
-        [StringLength(80, MinimumLength = 2)]
         public string? Instrumentation { get; set; }
 
         [Range(40, 220)]
