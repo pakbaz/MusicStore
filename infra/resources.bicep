@@ -61,7 +61,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
         name: musicgenWorkloadProfileName
         workloadProfileType: musicgenWorkloadProfileType
         minimumCount: 0
-        maximumCount: 1
+        maximumCount: 2
       }
     ]
   }
