@@ -15,7 +15,6 @@ namespace MvcMusicStore.Services
     /// </summary>
     public class AceStepMusicCreationService : IAiMusicCreationService
     {
-        private static readonly string[] TempoDescriptors = ["Nocturne", "Motion", "Drive", "Lift"];
         private static readonly string[] CoreNouns = ["Canvas", "Signal", "Orbit", "Echo", "Spectrum", "Pulse", "Horizon", "Waves"];
         private static readonly string[] RestrictedTerms =
         [
@@ -52,25 +51,22 @@ namespace MvcMusicStore.Services
 
         public async Task<AiMusicCreationResult> GenerateAsync(AiMusicCreationRequest request, CancellationToken cancellationToken = default)
         {
-            EnsureOriginalitySafeInput(request.StyleDirection);
+            string userPrompt = (request.Prompt ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(userPrompt))
+            {
+                throw new InvalidOperationException("Please describe the music you want to generate.");
+            }
 
-            string style = ToTitleCase(request.StyleDirection);
-            string mood = ToTitleCase(request.Mood);
-            string instrumentation = ToTitleCase(request.Instrumentation);
-            string genre = ToTitleCase(request.GenreName);
-            int tempoBucket = GetTempoBucket(request.TempoBpm);
+            EnsureOriginalitySafeInput(userPrompt);
 
-            int styleToken = StableToken($"{genre}|{style}|{mood}|{instrumentation}|{request.TempoBpm}");
-            string noun = CoreNouns[styleToken % CoreNouns.Length];
-            _ = TempoDescriptors[tempoBucket];
-
-            string title = $"{mood} {genre} {noun} ({request.TempoBpm} BPM · {style})";
-            string artistName = $"AI {instrumentation} Collective";
-
-            string prompt = BuildPrompt(genre, style, mood, instrumentation, request.TempoBpm);
+            string title = BuildTitle(userPrompt);
+            string artistName = BuildArtistName(userPrompt);
+            string prompt = BuildModelPrompt(userPrompt);
 
             string? audioUrl = null;
-            int durationSeconds = Math.Max(1, musicGenOptions.DefaultDurationSeconds);
+            int durationSeconds = request.DurationSeconds > 0
+                ? request.DurationSeconds
+                : Math.Max(1, musicGenOptions.DefaultDurationSeconds);
 
             if (string.IsNullOrWhiteSpace(musicGenOptions.BaseUrl))
             {
@@ -85,7 +81,7 @@ namespace MvcMusicStore.Services
                     {
                         Prompt = prompt,
                         DurationSeconds = durationSeconds,
-                        Bpm = request.TempoBpm > 0 ? request.TempoBpm : null,
+                        Bpm = null,
                         Format = "mp3"
                     }, cancellationToken);
 
@@ -128,8 +124,8 @@ namespace MvcMusicStore.Services
                 AudioUrl = audioUrl,
                 DurationSeconds = audioUrl is null ? 0 : durationSeconds,
                 SuggestedPrice = options.DefaultPrice,
-                OriginalityStatement = $"Original AI-generated composition using {genre} genre direction with {style} style guidance. " +
-                    "This output is generated locally by the ACE-Step model from abstract musical parameters and is not a copy of any specific copyrighted track."
+                OriginalityStatement = "Original AI-generated instrumental composed locally by the ACE-Step model from your text prompt. " +
+                    "It is an original work, not a copy of any specific copyrighted recording."
             };
         }
 
@@ -150,20 +146,48 @@ namespace MvcMusicStore.Services
             return "/media/music/" + blobName;
         }
 
-        private static string BuildPrompt(string genre, string style, string mood, string instrumentation, int tempoBpm)
+        private static string BuildModelPrompt(string userPrompt)
         {
-            return $"{mood} {genre} instrumental, {style} style, featuring {instrumentation}, around {tempoBpm} BPM. " +
-                   "Original, high quality, cohesive arrangement.";
+            string trimmed = userPrompt.Trim();
+            if (trimmed.IndexOf("instrumental", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                trimmed += ", instrumental";
+            }
+
+            return trimmed + ". Original, high quality, cohesive arrangement.";
         }
 
-        private static void EnsureOriginalitySafeInput(string styleDirection)
+        private static string BuildTitle(string userPrompt)
         {
-            string normalized = styleDirection.Trim().ToLowerInvariant();
+            string[] words = userPrompt.Split(
+                [' ', '\t', '\n', '\r', ',', '.', ';', ':', '-'],
+                StringSplitOptions.RemoveEmptyEntries);
+
+            if (words.Length == 0)
+            {
+                return "Untitled AI Track";
+            }
+
+            string head = string.Join(' ', words.Take(6));
+            string title = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(head.ToLowerInvariant());
+            return title.Length > 60 ? title[..60].TrimEnd() : title;
+        }
+
+        private static string BuildArtistName(string userPrompt)
+        {
+            int token = StableToken(userPrompt);
+            string noun = CoreNouns[token % CoreNouns.Length];
+            return $"AI {noun} Collective";
+        }
+
+        private static void EnsureOriginalitySafeInput(string text)
+        {
+            string normalized = text.Trim().ToLowerInvariant();
             foreach (string term in RestrictedTerms)
             {
                 if (normalized.Contains(term, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException("Style direction requests must avoid copying or recreating specific existing songs.");
+                    throw new InvalidOperationException("Prompts must avoid copying or recreating specific existing songs or artists.");
                 }
             }
         }
@@ -172,20 +196,6 @@ namespace MvcMusicStore.Services
         {
             byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
             return BitConverter.ToInt32(bytes, 0) & int.MaxValue;
-        }
-
-        private static int GetTempoBucket(int tempoBpm)
-        {
-            if (tempoBpm <= 80) return 0;
-            if (tempoBpm <= 115) return 1;
-            if (tempoBpm <= 145) return 2;
-            return 3;
-        }
-
-        private static string ToTitleCase(string input)
-        {
-            string normalized = input.Trim().ToLowerInvariant();
-            return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalized);
         }
 
         private sealed class GenerateRequest

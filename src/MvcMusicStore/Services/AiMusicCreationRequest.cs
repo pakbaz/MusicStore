@@ -2,14 +2,14 @@ namespace MvcMusicStore.Services
 {
     public class AiMusicCreationRequest
     {
-        public required string GenreName { get; init; }
+        /// <summary>
+        /// Free-form description of the music to generate (genre, style, mood, instrumentation, tempo, etc.).
+        /// </summary>
+        public required string Prompt { get; init; }
 
-        public required string StyleDirection { get; init; }
-
-        public required string Mood { get; init; }
-
-        public required string Instrumentation { get; init; }
-
-        public int TempoBpm { get; init; }
+        /// <summary>
+        /// Requested track length in seconds. When 0, the service default is used.
+        /// </summary>
+        public int DurationSeconds { get; init; }
     }
 }

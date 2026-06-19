@@ -103,6 +103,10 @@ builder.Services.AddSession(options =>
 builder.Services.Configure<AiMusicCreationOptions>(
     builder.Configuration.GetSection(AiMusicCreationOptions.SectionName));
 
+// Tracks asynchronous AI music generation jobs so the browser polls for progress
+// instead of holding a multi-minute HTTP request open (avoids the ingress timeout).
+builder.Services.AddSingleton<IAiMusicJobStore, AiMusicJobStore>();
+
 // AI music generation is delegated to the ACE-Step music generation service (separate container).
 builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationService>(client =>
 {

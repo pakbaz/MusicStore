@@ -1089,3 +1089,76 @@ input[type="checkbox"].input-validation-error {
     border: 1px solid var(--border-strong);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
 }
+
+/* ===== AI Music Creation ===== */
+.ai-music { max-width: 840px; }
+.ai-music-lead { color: var(--text-muted); font-size: 15px; margin-bottom: 24px; }
+.ai-music-label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--text); }
+
+.ai-sample-prompts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-chip {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-2);
+    color: var(--text);
+    border-radius: 18px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.ai-chip:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.ai-chip:active { transform: translateY(1px); }
+
+.ai-prompt {
+    resize: vertical;
+    min-height: 96px;
+    font-size: 15px;
+    background: var(--bg-2);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+}
+.ai-prompt:focus { border-color: var(--accent); box-shadow: none; }
+.ai-prompt-meta { text-align: right; color: var(--text-faint); font-size: 12px; margin-top: 4px; }
+
+.ai-controls-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.ai-duration { width: 170px; }
+.ai-duration select { background: var(--bg-2); color: var(--text); border: 1px solid var(--border-strong); }
+.ai-generate { flex: 1; }
+.ai-generate .btn { min-width: 220px; }
+
+.ai-panel { margin-top: 24px; padding: 20px; border-radius: 12px; }
+
+.ai-progress {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+}
+.ai-spinner {
+    width: 38px; height: 38px;
+    border: 4px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: ai-spin 0.9s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-progress-status { font-weight: 600; font-size: 16px; margin: 0 0 4px; color: var(--text); }
+.ai-progress-elapsed { margin: 0 0 6px; color: var(--text-muted); }
+.ai-progress-note { margin: 0; color: var(--text-faint); font-size: 13px; }
+
+.ai-result {
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+}
+.ai-result-header h3 { margin-top: 0; color: var(--text); }
+.ai-result-sub { color: var(--text-muted); font-size: 15px; }
+.ai-result-badges { margin-left: 8px; }
+.ai-result-badges .label { font-size: 12px; margin-left: 4px; }
+.ai-audio-wrap { margin: 16px 0; }
+.ai-audio-wrap audio { width: 100%; }
+.ai-originality { color: var(--text-muted); font-style: italic; font-size: 13px; }
+.ai-result-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.ai-error-actions { margin-top: 10px; }
