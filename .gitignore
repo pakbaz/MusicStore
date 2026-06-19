@@ -33,6 +33,7 @@ App_Data/
 Packages/
 .vs/
 *.db
+!src/MvcMusicStore/MvcMusicStore.db
 *.db-shm
 *.db-wal
 src/MvcMusicStore/wwwroot/Images/MetadataCache/*
