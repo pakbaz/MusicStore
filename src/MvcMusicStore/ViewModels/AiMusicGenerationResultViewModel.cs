@@ -21,5 +21,9 @@ namespace MvcMusicStore.ViewModels
         public required decimal SuggestedPrice { get; init; }
 
         public required string OriginalityStatement { get; init; }
+
+        public string? AudioUrl { get; init; }
+
+        public int DurationSeconds { get; init; }
     }
 }

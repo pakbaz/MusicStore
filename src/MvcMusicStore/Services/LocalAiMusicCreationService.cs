@@ -28,7 +28,7 @@ namespace MvcMusicStore.Services
             options = optionsAccessor.Value;
         }
 
-        public AiMusicCreationResult Generate(AiMusicCreationRequest request)
+        public Task<AiMusicCreationResult> GenerateAsync(AiMusicCreationRequest request, CancellationToken cancellationToken = default)
         {
             EnsureOriginalitySafeInput(request.StyleDirection);
 
@@ -42,7 +42,7 @@ namespace MvcMusicStore.Services
             string tempoDescriptor = TempoDescriptors[tempoBucket];
             string noun = CoreNouns[styleToken % CoreNouns.Length];
 
-            return new AiMusicCreationResult
+            return Task.FromResult(new AiMusicCreationResult
             {
                 Title = $"{mood} {genre} {noun} ({request.TempoBpm} BPM · {style})",
                 ArtistName = $"AI {instrumentation} Collective",
@@ -50,7 +50,7 @@ namespace MvcMusicStore.Services
                 SuggestedPrice = options.DefaultPrice,
                 OriginalityStatement = $"Original AI-generated composition using {genre} genre direction with {style} style guidance. " +
                     "This output is generated from abstract musical parameters and is not a copy of any specific copyrighted track."
-            };
+            });
         }
 
         private static void EnsureOriginalitySafeInput(string styleDirection)

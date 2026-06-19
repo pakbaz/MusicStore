@@ -39,7 +39,13 @@ namespace MvcMusicStore.Models
 
         public int GenreId { get; set; }
 
+        [StringLength(120)]
+        public string? GenreName { get; set; }
+
         public int ArtistId { get; set; }
+
+        [StringLength(160)]
+        public string? ArtistName { get; set; }
 
         [Required]
         [StringLength(160, MinimumLength = 2)]
@@ -54,6 +60,10 @@ namespace MvcMusicStore.Models
         [DisplayName("Album Art URL")]
         [StringLength(1024)]
         public string? AlbumArtUrl { get; set; }
+
+        [DisplayName("Audio URL")]
+        [StringLength(1024)]
+        public string? AudioUrl { get; set; }
 
         [DisplayName("Metadata Thumbnail URL")]
         [StringLength(1024)]

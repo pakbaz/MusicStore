@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
 using MvcMusicStore.ViewModels;
@@ -14,11 +15,11 @@ namespace MvcMusicStore.ViewComponents
             _db = db;
         }
 
-        public IViewComponentResult Invoke()
+        public async Task<IViewComponentResult> InvokeAsync()
         {
             var cart = ShoppingCart.GetCart(_db, HttpContext);
 
-            var cartItems = cart.GetCartItems()
+            var cartItems = (await cart.GetCartItemsAsync())
                 .Where(item => item.Album != null)
                 .OrderBy(item => item.Album!.Title)
                 .ToList();

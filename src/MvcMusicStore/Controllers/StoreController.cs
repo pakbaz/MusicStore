@@ -17,82 +17,91 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Store/
 
-        public IActionResult Index(string? search, string? genre, decimal? minPrice, decimal? maxPrice, string? availability, string? sort)
+        public async Task<IActionResult> Index(string? search, string? genre, decimal? minPrice, decimal? maxPrice, string? availability, string? sort)
         {
             var normalizedSort = CatalogSortOptions.Normalize(sort);
             var normalizedAvailability = CatalogAvailabilityOptions.Normalize(availability);
 
-            IQueryable<CatalogAlbumItemViewModel> query = storeDB.Albums
-                .Select(album => new CatalogAlbumItemViewModel
-                {
-                    AlbumId = album.AlbumId,
-                    Title = album.Title ?? string.Empty,
-                    ArtistName = album.Artist!.Name ?? string.Empty,
-                    GenreName = album.Genre!.Name ?? string.Empty,
-                    Price = album.Price,
-                    AlbumArtUrl = !string.IsNullOrEmpty(album.UploadedThumbnailUrl) && album.UploadedThumbnailUrl != Album.DefaultPlaceholderThumbnailUrl && album.UploadedThumbnailUrl != "~/Images/placeholder.png" && album.UploadedThumbnailUrl != "/Images/placeholder.png"
-                        ? album.UploadedThumbnailUrl
-                        : !string.IsNullOrEmpty(album.MetadataThumbnailUrl) && album.MetadataThumbnailUrl != Album.DefaultPlaceholderThumbnailUrl && album.MetadataThumbnailUrl != "~/Images/placeholder.png" && album.MetadataThumbnailUrl != "/Images/placeholder.png"
-                            ? album.MetadataThumbnailUrl
-                            : !string.IsNullOrEmpty(album.AlbumArtUrl) && album.AlbumArtUrl != Album.DefaultPlaceholderThumbnailUrl && album.AlbumArtUrl != "~/Images/placeholder.png" && album.AlbumArtUrl != "/Images/placeholder.png"
-                                ? album.AlbumArtUrl
-                                : Album.DefaultPlaceholderThumbnailUrl,
-                    ReleaseDate = album.ReleaseDate,
-                    IsAvailable = album.IsAvailable,
-                    Popularity = album.OrderDetails!.Sum(orderDetail => (int?)orderDetail.Quantity) ?? 0
-                });
+            var albums = await storeDB.Albums.ToListAsync();
+            var salesByAlbum = await GetSalesByAlbumAsync();
+
+            IEnumerable<CatalogAlbumItemViewModel> items = albums.Select(album => new CatalogAlbumItemViewModel
+            {
+                AlbumId = album.AlbumId,
+                Title = album.Title ?? string.Empty,
+                ArtistName = album.ArtistName ?? string.Empty,
+                GenreName = album.GenreName ?? string.Empty,
+                Price = album.Price,
+                AlbumArtUrl = album.GetDisplayThumbnailUrl(),
+                ReleaseDate = album.ReleaseDate,
+                IsAvailable = album.IsAvailable,
+                Popularity = salesByAlbum.TryGetValue(album.AlbumId, out var sold) ? sold : 0
+            });
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();
-                query = query.Where(album =>
-                    album.Title.Contains(term) ||
-                    album.ArtistName.Contains(term) ||
-                    album.GenreName.Contains(term));
+                items = items.Where(album =>
+                    Contains(album.Title, term) ||
+                    Contains(album.ArtistName, term) ||
+                    Contains(album.GenreName, term));
             }
 
             if (!string.IsNullOrWhiteSpace(genre))
             {
-                query = query.Where(album => album.GenreName == genre);
+                items = items.Where(album => string.Equals(album.GenreName, genre, StringComparison.OrdinalIgnoreCase));
             }
 
             if (minPrice.HasValue)
             {
-                query = query.Where(album => album.Price >= minPrice.Value);
+                items = items.Where(album => album.Price >= minPrice.Value);
             }
 
             if (maxPrice.HasValue)
             {
-                query = query.Where(album => album.Price <= maxPrice.Value);
+                items = items.Where(album => album.Price <= maxPrice.Value);
             }
 
             if (normalizedAvailability == CatalogAvailabilityOptions.Available)
             {
-                query = query.Where(album => album.IsAvailable);
+                items = items.Where(album => album.IsAvailable);
             }
             else if (normalizedAvailability == CatalogAvailabilityOptions.Unavailable)
             {
-                query = query.Where(album => !album.IsAvailable);
+                items = items.Where(album => !album.IsAvailable);
             }
 
-            query = normalizedSort switch
+            items = normalizedSort switch
             {
-                CatalogSortOptions.ReleaseDateDesc => query
+                CatalogSortOptions.ReleaseDateDesc => items
                     .OrderByDescending(album => album.ReleaseDate ?? DateTime.MinValue)
                     .ThenBy(album => album.Title),
-                CatalogSortOptions.ReleaseDateAsc => query
+                CatalogSortOptions.ReleaseDateAsc => items
                     .OrderBy(album => album.ReleaseDate ?? DateTime.MaxValue)
                     .ThenBy(album => album.Title),
-                CatalogSortOptions.PriceAsc => query
+                CatalogSortOptions.PriceAsc => items
                     .OrderBy(album => album.Price)
                     .ThenBy(album => album.Title),
-                CatalogSortOptions.PriceDesc => query
+                CatalogSortOptions.PriceDesc => items
                     .OrderByDescending(album => album.Price)
                     .ThenBy(album => album.Title),
-                _ => query
+                _ => items
                     .OrderByDescending(album => album.Popularity)
                     .ThenBy(album => album.Title)
             };
+
+            var albumList = items.ToList();
+            foreach (var album in albumList)
+            {
+                album.AlbumArtUrl = Album.NormalizeThumbnailUrl(album.AlbumArtUrl);
+            }
+
+            var genreNames = albums
+                .Select(album => album.GenreName ?? string.Empty)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .OrderBy(name => name)
+                .ToList();
 
             var catalogModel = new CatalogIndexViewModel
             {
@@ -102,23 +111,13 @@ namespace MvcMusicStore.Controllers
                 MaxPrice = maxPrice,
                 Availability = normalizedAvailability,
                 Sort = normalizedSort,
-                Genres = storeDB.Genres
-                    .OrderBy(item => item.Name)
-                    .Select(item => item.Name ?? string.Empty)
-                    .ToList(),
-                Albums = query.ToList()
+                Genres = genreNames,
+                Albums = albumList,
+                TotalResults = albumList.Count
             };
-
-            foreach (var album in catalogModel.Albums)
-            {
-                album.AlbumArtUrl = Album.NormalizeThumbnailUrl(album.AlbumArtUrl);
-            }
-
-            catalogModel.TotalResults = catalogModel.Albums.Count;
 
             return View(catalogModel);
         }
-
 
         //
         // GET: /Store/Browse?genre=Disco
@@ -133,31 +132,31 @@ namespace MvcMusicStore.Controllers
             return RedirectToAction(nameof(Index), new { genre });
         }
 
-        public IActionResult Details(int id)
+        public async Task<IActionResult> Details(int id)
         {
-            var album = storeDB.Albums
-                .Include(a => a.Genre)
-                .Include(a => a.Artist)
-                .SingleOrDefault(a => a.AlbumId == id);
+            var albums = await storeDB.Albums.ToListAsync();
+            var album = albums.FirstOrDefault(a => a.AlbumId == id);
 
             if (album == null)
             {
                 return NotFound();
             }
 
-            var relatedByGenre = storeDB.Albums
-                .Include(a => a.Artist)
+            album.PopulateNavigation();
+
+            var relatedByGenre = albums
                 .Where(a => a.AlbumId != id && a.GenreId == album.GenreId)
                 .OrderBy(a => a.Title)
                 .Take(4)
                 .ToList();
+            relatedByGenre.PopulateNavigation();
 
-            var moreFromArtist = storeDB.Albums
-                .Include(a => a.Genre)
+            var moreFromArtist = albums
                 .Where(a => a.AlbumId != id && a.ArtistId == album.ArtistId)
                 .OrderBy(a => a.Title)
                 .Take(4)
                 .ToList();
+            moreFromArtist.PopulateNavigation();
 
             var viewModel = new AlbumDetailsViewModel
             {
@@ -169,31 +168,33 @@ namespace MvcMusicStore.Controllers
             return View(viewModel);
         }
 
-        public IActionResult Artist(int id)
+        public async Task<IActionResult> Artist(int id)
         {
-            var artist = storeDB.Artists.SingleOrDefault(a => a.ArtistId == id);
+            var artist = await storeDB.Artists.FirstOrDefaultAsync(a => a.ArtistId == id);
 
             if (artist == null)
             {
                 return NotFound();
             }
 
-            var artistAlbums = storeDB.Albums
-                .Include(a => a.Genre)
+            var albums = await storeDB.Albums.ToListAsync();
+
+            var artistAlbums = albums
                 .Where(a => a.ArtistId == id)
                 .OrderBy(a => a.Title)
                 .ToList();
+            artistAlbums.PopulateNavigation();
 
             var artistAlbumIds = artistAlbums.Select(a => a.AlbumId).ToHashSet();
-            var genreIds = artistAlbums.Select(a => a.GenreId).Distinct().ToList();
+            var genreIds = artistAlbums.Select(a => a.GenreId).Distinct().ToHashSet();
 
-            var relatedAlbums = storeDB.Albums
-                .Include(a => a.Artist)
+            var relatedAlbums = albums
                 .Where(a => !artistAlbumIds.Contains(a.AlbumId) && genreIds.Contains(a.GenreId))
                 .OrderByDescending(a => a.IsFeatured)
                 .ThenBy(a => a.Title)
                 .Take(6)
                 .ToList();
+            relatedAlbums.PopulateNavigation();
 
             var viewModel = new ArtistDetailsViewModel
             {
@@ -203,6 +204,20 @@ namespace MvcMusicStore.Controllers
             };
 
             return View(viewModel);
+        }
+
+        private async Task<Dictionary<int, int>> GetSalesByAlbumAsync()
+        {
+            var orders = await storeDB.Orders.ToListAsync();
+            return orders
+                .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
+                .GroupBy(detail => detail.AlbumId)
+                .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
+        }
+
+        private static bool Contains(string source, string term)
+        {
+            return source.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

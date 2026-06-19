@@ -1,5 +1,9 @@
+using Azure.Core;
+using Azure.Identity;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
 
@@ -15,23 +19,57 @@ builder.Services.AddHttpClient<IAlbumMetadataService, MusicBrainzAlbumArtworkSer
 {
     client.Timeout = TimeSpan.FromSeconds(10);
 });
-builder.Services.AddHttpClient<IThumbnailCacheService, LocalThumbnailCacheService>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(20);
-});
 builder.Services.Configure<ThumbnailCacheOptions>(
     builder.Configuration.GetSection(ThumbnailCacheOptions.SectionName));
 builder.Services.Configure<AlbumMetadataEnrichmentOptions>(
     builder.Configuration.GetSection(AlbumMetadataEnrichmentOptions.SectionName));
+builder.Services.Configure<StorageOptions>(
+    builder.Configuration.GetSection(StorageOptions.SectionName));
+builder.Services.Configure<MusicGenOptions>(
+    builder.Configuration.GetSection(MusicGenOptions.SectionName));
+
+// Shared managed-identity credential. A single instance is reused for Blob Storage and both
+// Cosmos DbContexts so EF Core caches one internal service provider instead of building a new
+// one per request (which triggers ManyServiceProvidersCreatedWarning and fails after 20).
+var azureCredential = CreateAzureCredential(builder.Configuration);
+
+// Azure Blob Storage (thumbnails + generated music). Local dev uses a connection string (Azurite);
+// Azure uses the blob endpoint with managed identity.
+builder.Services.AddSingleton(sp =>
+{
+    var storage = sp.GetRequiredService<IOptions<StorageOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(storage.ConnectionString))
+    {
+        return new BlobServiceClient(storage.ConnectionString);
+    }
+
+    if (string.IsNullOrWhiteSpace(storage.BlobEndpoint))
+    {
+        throw new InvalidOperationException("Storage:BlobEndpoint or Storage:ConnectionString must be configured.");
+    }
+
+    return new BlobServiceClient(new Uri(storage.BlobEndpoint), azureCredential);
+});
+
+// Thumbnails are cached to Azure Blob Storage.
+builder.Services.AddHttpClient<IThumbnailCacheService, BlobThumbnailCacheService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddHostedService<AlbumMetadataEnrichmentWorker>();
 
-// Add Entity Framework - Music Store
+// Add Entity Framework Core (Azure Cosmos DB) for both the catalog and ASP.NET Identity.
+var cosmosConnectionString = builder.Configuration["Cosmos:ConnectionString"];
+var cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"];
+var cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? "musicstore";
+var cosmosUseEmulatorWorkarounds = builder.Configuration.GetValue("Cosmos:UseEmulatorWorkarounds", false);
+
 builder.Services.AddDbContext<MusicStoreEntities>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("MusicStoreEntities")));
+    ConfigureCosmos(options, cosmosConnectionString, cosmosEndpoint, cosmosDatabase, cosmosUseEmulatorWorkarounds, azureCredential));
 
 // Add Entity Framework - Identity
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    ConfigureCosmos(options, cosmosConnectionString, cosmosEndpoint, cosmosDatabase, cosmosUseEmulatorWorkarounds, azureCredential));
 
 // Add ASP.NET Core Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -64,7 +102,13 @@ builder.Services.AddSession(options =>
 
 builder.Services.Configure<AiMusicCreationOptions>(
     builder.Configuration.GetSection(AiMusicCreationOptions.SectionName));
-builder.Services.AddScoped<IAiMusicCreationService, LocalAiMusicCreationService>();
+
+// AI music generation is delegated to the ACE-Step music generation service (separate container).
+builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationService>(client =>
+{
+    var timeoutSeconds = builder.Configuration.GetValue("MusicGen:TimeoutSeconds", 600);
+    client.Timeout = TimeSpan.FromSeconds(timeoutSeconds <= 0 ? 600 : timeoutSeconds);
+});
 
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
@@ -104,14 +148,9 @@ static async Task SeedDatabaseAsync(WebApplication app)
 
     try
     {
-        // Ensure databases are created
+        // Ensure Cosmos database and containers exist
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
-        if (!await HasAlbumCatalogColumnsAsync(musicStoreDb))
-        {
-            await musicStoreDb.Database.EnsureDeletedAsync();
-            await musicStoreDb.Database.EnsureCreatedAsync();
-        }
 
         var identityDb = services.GetRequiredService<ApplicationDbContext>();
         await identityDb.Database.EnsureCreatedAsync();
@@ -151,42 +190,43 @@ static async Task SeedDatabaseAsync(WebApplication app)
     }
 }
 
-static async Task<bool> HasAlbumCatalogColumnsAsync(MusicStoreEntities dbContext)
+static void ConfigureCosmos(
+    DbContextOptionsBuilder options,
+    string? connectionString,
+    string? endpoint,
+    string database,
+    bool useEmulatorWorkarounds,
+    TokenCredential credential)
 {
-    await using var connection = dbContext.Database.GetDbConnection();
-    if (connection.State != System.Data.ConnectionState.Open)
+    if (!string.IsNullOrWhiteSpace(connectionString))
     {
-        await connection.OpenAsync();
+        options.UseCosmos(connectionString, database, cosmos =>
+        {
+            if (useEmulatorWorkarounds)
+            {
+                // The local Cosmos emulator (vnext) serves plain HTTP and requires Gateway mode.
+                cosmos.ConnectionMode(Microsoft.Azure.Cosmos.ConnectionMode.Gateway);
+                cosmos.LimitToEndpoint(true);
+            }
+        });
+    }
+    else if (!string.IsNullOrWhiteSpace(endpoint))
+    {
+        options.UseCosmos(endpoint, credential, database);
+    }
+    else
+    {
+        throw new InvalidOperationException("Cosmos:ConnectionString or Cosmos:Endpoint must be configured.");
+    }
+}
+
+static TokenCredential CreateAzureCredential(IConfiguration configuration)
+{
+    var clientId = configuration["AZURE_CLIENT_ID"];
+    if (!string.IsNullOrWhiteSpace(clientId))
+    {
+        return new DefaultAzureCredential(new DefaultAzureCredentialOptions { ManagedIdentityClientId = clientId });
     }
 
-    await using var command = connection.CreateCommand();
-    command.CommandText = "PRAGMA table_info('Albums');";
-
-    await using var reader = await command.ExecuteReaderAsync();
-    var hasReleaseDate = false;
-    var hasIsAvailable = false;
-    var hasMetadataThumbnailUrl = false;
-    var hasUploadedThumbnailUrl = false;
-    while (await reader.ReadAsync())
-    {
-        var columnName = reader.GetString(reader.GetOrdinal("name"));
-        if (string.Equals(columnName, "ReleaseDate", StringComparison.OrdinalIgnoreCase))
-        {
-            hasReleaseDate = true;
-        }
-        else if (string.Equals(columnName, "IsAvailable", StringComparison.OrdinalIgnoreCase))
-        {
-            hasIsAvailable = true;
-        }
-        else if (string.Equals(columnName, "MetadataThumbnailUrl", StringComparison.OrdinalIgnoreCase))
-        {
-            hasMetadataThumbnailUrl = true;
-        }
-        else if (string.Equals(columnName, "UploadedThumbnailUrl", StringComparison.OrdinalIgnoreCase))
-        {
-            hasUploadedThumbnailUrl = true;
-        }
-    }
-
-    return hasReleaseDate && hasIsAvailable && hasMetadataThumbnailUrl && hasUploadedThumbnailUrl;
+    return new DefaultAzureCredential();
 }

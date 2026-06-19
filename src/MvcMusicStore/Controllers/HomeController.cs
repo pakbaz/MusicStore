@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +19,18 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Home/
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             const int sectionSize = 6;
-            var featuredAlbums = GetFeaturedAlbums(sectionSize);
-            var trendingAlbums = GetTopSellingAlbums(sectionSize);
-            var curatedAlbums = GetNewReleases(sectionSize, featuredAlbums.Select(a => a.AlbumId));
+
+            var albums = await storeDB.Albums.ToListAsync();
+            albums.PopulateNavigation();
+            var salesByAlbum = await GetSalesByAlbumAsync();
+
+            var featuredAlbums = GetFeaturedAlbums(albums, sectionSize);
+            var trendingAlbums = GetTopSellingAlbums(albums, salesByAlbum, sectionSize);
+            var featuredIds = featuredAlbums.Select(a => a.AlbumId).ToHashSet();
+            var curatedAlbums = GetNewReleases(albums, sectionSize, featuredIds);
 
             var viewModel = new HomeIndexViewModel
             {
@@ -36,10 +42,9 @@ namespace MvcMusicStore.Controllers
             return View(viewModel);
         }
 
-        private List<Album> GetFeaturedAlbums(int count)
+        private static List<Album> GetFeaturedAlbums(List<Album> albums, int count)
         {
-            var featuredAlbums = storeDB.Albums
-                .Include(a => a.Artist)
+            var featuredAlbums = albums
                 .Where(a => a.IsFeatured)
                 .OrderBy(a => a.Title)
                 .Take(count)
@@ -51,58 +56,39 @@ namespace MvcMusicStore.Controllers
             }
 
             var featuredIds = featuredAlbums.Select(a => a.AlbumId).ToHashSet();
-            var fallbackAlbums = storeDB.Albums
-                .Include(a => a.Artist)
+            featuredAlbums.AddRange(albums
                 .Where(a => !featuredIds.Contains(a.AlbumId))
                 .OrderByDescending(a => a.AlbumId)
-                .Take(count - featuredAlbums.Count)
-                .ToList();
+                .Take(count - featuredAlbums.Count));
 
-            featuredAlbums.AddRange(fallbackAlbums);
             return featuredAlbums;
         }
 
-        private List<Album> GetTopSellingAlbums(int count)
+        private static List<Album> GetTopSellingAlbums(List<Album> albums, IReadOnlyDictionary<int, int> salesByAlbum, int count)
         {
-            var topSellingAlbums = storeDB.OrderDetails
-                .GroupBy(od => od.AlbumId)
-                .Select(g => new { AlbumId = g.Key, TotalSold = g.Sum(od => od.Quantity) })
-                .OrderByDescending(x => x.TotalSold)
+            return albums
+                .OrderByDescending(a => salesByAlbum.TryGetValue(a.AlbumId, out var sold) ? sold : 0)
+                .ThenByDescending(a => a.AlbumId)
                 .Take(count)
-                .Join(
-                    storeDB.Albums.Include(a => a.Artist),
-                    x => x.AlbumId,
-                    a => a.AlbumId,
-                    (x, a) => a)
                 .ToList();
-
-            if (topSellingAlbums.Count >= count)
-            {
-                return topSellingAlbums;
-            }
-
-            var topSellingIds = topSellingAlbums.Select(a => a.AlbumId).ToHashSet();
-            var fallbackAlbums = storeDB.Albums
-                .Include(a => a.Artist)
-                .Where(a => !topSellingIds.Contains(a.AlbumId))
-                .OrderByDescending(a => a.AlbumId)
-                .Take(count - topSellingAlbums.Count)
-                .ToList();
-
-            topSellingAlbums.AddRange(fallbackAlbums);
-            return topSellingAlbums;
         }
 
-        private List<Album> GetNewReleases(int count, IEnumerable<int> excludeAlbumIds)
+        private static List<Album> GetNewReleases(List<Album> albums, int count, HashSet<int> excludeAlbumIds)
         {
-            var excludedIds = excludeAlbumIds.ToHashSet();
-
-            return storeDB.Albums
-                .Include(a => a.Artist)
-                .Where(a => !excludedIds.Contains(a.AlbumId))
+            return albums
+                .Where(a => !excludeAlbumIds.Contains(a.AlbumId))
                 .OrderByDescending(a => a.AlbumId)
                 .Take(count)
                 .ToList();
+        }
+
+        private async Task<Dictionary<int, int>> GetSalesByAlbumAsync()
+        {
+            var orders = await storeDB.Orders.ToListAsync();
+            return orders
+                .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
+                .GroupBy(detail => detail.AlbumId)
+                .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
         }
     }
 }

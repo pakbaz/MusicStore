@@ -11,6 +11,10 @@ namespace MvcMusicStore.Models
         public int AlbumId   { get; set; }
         public int Count     { get; set; }
 
+        public string? AlbumTitle { get; set; }
+        public decimal AlbumPrice { get; set; }
+        public string? AlbumArtUrl { get; set; }
+
         [DataType(DataType.DateTime)]
         public DateTime DateCreated { get; set; }
 

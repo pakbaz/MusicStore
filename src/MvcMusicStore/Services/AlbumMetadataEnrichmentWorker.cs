@@ -65,27 +65,15 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
         var thumbnailCache = scope.ServiceProvider.GetRequiredService<IThumbnailCacheService>();
 
         var batchSize = Math.Clamp(currentOptions.BatchSize, 1, 100);
-        var albums = await db.Albums
-            .Include(album => album.Artist)
+        var allAlbums = await db.Albums.ToListAsync(cancellationToken);
+        var albums = allAlbums
             .Where(album => !attemptedAlbumIds.Contains(album.AlbumId) &&
-                album.Artist != null &&
-                (!album.ReleaseDate.HasValue ||
-                 (album.MetadataThumbnailUrl != null &&
-                  (album.MetadataThumbnailUrl.StartsWith("http://") ||
-                   album.MetadataThumbnailUrl.StartsWith("https://"))) ||
-                 ((album.MetadataThumbnailUrl == null || album.MetadataThumbnailUrl == string.Empty) &&
-                  (album.UploadedThumbnailUrl == null || album.UploadedThumbnailUrl == string.Empty) &&
-                  (album.AlbumArtUrl == null ||
-                   album.AlbumArtUrl == string.Empty ||
-                   album.AlbumArtUrl == Album.DefaultPlaceholderThumbnailUrl ||
-                   album.AlbumArtUrl == "~/Images/placeholder.png" ||
-                   album.AlbumArtUrl == "/Images/placeholder.png"))))
-            .OrderByDescending(album => album.MetadataThumbnailUrl != null &&
-                (album.MetadataThumbnailUrl.StartsWith("http://") ||
-                 album.MetadataThumbnailUrl.StartsWith("https://")))
+                !string.IsNullOrWhiteSpace(album.ArtistName) &&
+                NeedsEnrichment(album))
+            .OrderByDescending(album => IsRemoteThumbnailUrl(album.MetadataThumbnailUrl))
             .ThenBy(album => album.AlbumId)
             .Take(batchSize)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         if (albums.Count == 0)
         {
@@ -101,7 +89,7 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
         var updatedCount = 0;
         foreach (var album in albums)
         {
-            if (string.IsNullOrWhiteSpace(album.Title) || string.IsNullOrWhiteSpace(album.Artist?.Name))
+            if (string.IsNullOrWhiteSpace(album.Title) || string.IsNullOrWhiteSpace(album.ArtistName))
             {
                 continue;
             }
@@ -115,15 +103,15 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
             {
                 try
                 {
-                    metadata = await metadataService.TryGetMetadataAsync(album.Artist.Name, album.Title, cancellationToken);
+                    metadata = await metadataService.TryGetMetadataAsync(album.ArtistName!, album.Title, cancellationToken);
                 }
                 catch (HttpRequestException ex)
                 {
-                    logger.LogWarning(ex, "Unable to enrich metadata for album '{AlbumTitle}' by '{ArtistName}'.", album.Title, album.Artist.Name);
+                    logger.LogWarning(ex, "Unable to enrich metadata for album '{AlbumTitle}' by '{ArtistName}'.", album.Title, album.ArtistName);
                 }
                 catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
                 {
-                    logger.LogWarning(ex, "Timed out enriching metadata for album '{AlbumTitle}' by '{ArtistName}'.", album.Title, album.Artist.Name);
+                    logger.LogWarning(ex, "Timed out enriching metadata for album '{AlbumTitle}' by '{ArtistName}'.", album.Title, album.ArtistName);
                 }
             }
 
@@ -164,6 +152,13 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
         }
 
         return albums.Count;
+    }
+
+    private static bool NeedsEnrichment(Album album)
+    {
+        return !album.ReleaseDate.HasValue ||
+               IsRemoteThumbnailUrl(album.MetadataThumbnailUrl) ||
+               ShouldApplyMetadataThumbnail(album);
     }
 
     private static bool IsRemoteThumbnailUrl(string? thumbnailUrl)

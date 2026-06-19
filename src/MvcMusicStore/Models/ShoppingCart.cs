@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace MvcMusicStore.Models
 {
@@ -25,10 +27,10 @@ namespace MvcMusicStore.Models
             return cart;
         }
 
-        public void AddToCart(Album album)
+        public async Task AddToCartAsync(Album album)
         {
             // Get the matching cart and album instances
-            var cartItem = _db.Carts.SingleOrDefault(
+            var cartItem = await _db.Carts.SingleOrDefaultAsync(
                 c => c.CartId == ShoppingCartId
                 && c.AlbumId == album.AlbumId);
 
@@ -37,10 +39,14 @@ namespace MvcMusicStore.Models
                 // Create a new cart item if no cart item exists
                 cartItem = new Cart
                 {
+                    RecordId = await _db.NextCartRecordIdAsync(),
                     AlbumId = album.AlbumId,
                     CartId = ShoppingCartId,
                     Count = 1,
-                    DateCreated = DateTime.Now
+                    DateCreated = DateTime.Now,
+                    AlbumTitle = album.Title,
+                    AlbumPrice = album.Price,
+                    AlbumArtUrl = album.GetDisplayThumbnailUrl()
                 };
 
                 _db.Carts.Add(cartItem);
@@ -52,10 +58,10 @@ namespace MvcMusicStore.Models
             }
         }
 
-        public int RemoveFromCart(int id)
+        public async Task<int> RemoveFromCartAsync(int id)
         {
             // Get the cart
-            var cartItem = _db.Carts.Single(
+            var cartItem = await _db.Carts.SingleOrDefaultAsync(
                 cart => cart.CartId == ShoppingCartId
                 && cart.RecordId == id);
 
@@ -72,17 +78,21 @@ namespace MvcMusicStore.Models
                 {
                     _db.Carts.Remove(cartItem);
                 }
-
             }
 
             return itemCount;
         }
 
-        public int UpdateCartItemCount(int id, int count)
+        public async Task<int> UpdateCartItemCountAsync(int id, int count)
         {
-            var cartItem = _db.Carts.Single(
+            var cartItem = await _db.Carts.SingleOrDefaultAsync(
                 cart => cart.CartId == ShoppingCartId
                 && cart.RecordId == id);
+
+            if (cartItem == null)
+            {
+                return 0;
+            }
 
             if (count <= 0)
             {
@@ -94,75 +104,67 @@ namespace MvcMusicStore.Models
             return cartItem.Count;
         }
 
-        public void EmptyCart()
+        public async Task EmptyCartAsync()
         {
-            var cartItems = _db.Carts.Where(cart => cart.CartId == ShoppingCartId);
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
 
             foreach (var cartItem in cartItems)
             {
                 _db.Carts.Remove(cartItem);
             }
-
         }
 
-        public List<Cart> GetCartItems()
+        public async Task<List<Cart>> GetCartItemsAsync()
         {
-            return _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToList();
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
+            cartItems.PopulateAlbum();
+            return cartItems;
         }
 
-        public int GetCount()
+        public async Task<int> GetCountAsync()
         {
-            // Get the count of each item in the cart and sum them up
-            int? count = (from cartItems in _db.Carts
-                          where cartItems.CartId == ShoppingCartId
-                          select (int?)cartItems.Count).Sum();
-
-            // Return 0 if all entries are null
-            return count ?? 0;
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
+            return cartItems.Sum(item => item.Count);
         }
 
-        public decimal GetTotal()
+        public async Task<decimal> GetTotalAsync()
         {
-            // Multiply album price by count of that album to get 
-            // the current price for each of those albums in the cart
-            // sum all album price totals to get the cart total
-            decimal? total = (from cartItems in _db.Carts
-                              where cartItems.CartId == ShoppingCartId
-                              select (int?)cartItems.Count * (cartItems.Album != null ? cartItems.Album.Price : 0)).Sum();
-            return total ?? decimal.Zero;
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
+            return cartItems.Sum(item => item.Count * item.AlbumPrice);
         }
 
-        public int CreateOrder(Order order)
+        public async Task<int> CreateOrderAsync(Order order)
         {
             decimal orderTotal = 0;
 
-            var cartItems = GetCartItems();
+            var cartItems = await GetCartItemsAsync();
+            order.OrderDetails ??= new List<OrderDetail>();
+
+            var orderDetailId = 1;
 
             // Iterate over the items in the cart, adding the order details for each
             foreach (var item in cartItems)
             {
-                var album = _db.Albums.Find(item.AlbumId);
-                if (album == null) continue;
-
                 var orderDetail = new OrderDetail
                 {
+                    OrderDetailId = orderDetailId++,
                     AlbumId = item.AlbumId,
                     OrderId = order.OrderId,
-                    UnitPrice = album.Price,
+                    UnitPrice = item.AlbumPrice,
                     Quantity = item.Count,
                 };
 
                 // Set the order total of the shopping cart
-                orderTotal += (item.Count * album.Price);
+                orderTotal += (item.Count * item.AlbumPrice);
 
-                _db.OrderDetails.Add(orderDetail);
+                order.OrderDetails.Add(orderDetail);
             }
 
             // Set the order's total to the orderTotal count
             order.Total = orderTotal;
 
             // Empty the shopping cart
-            EmptyCart();
+            await EmptyCartAsync();
 
             // Return the OrderId as the confirmation number
             return order.OrderId;
@@ -192,15 +194,14 @@ namespace MvcMusicStore.Models
 
         // When a user has logged in, migrate their shopping cart to
         // be associated with their username
-        public void MigrateCart(string userName)
+        public async Task MigrateCartAsync(string userName)
         {
-            var shoppingCart = _db.Carts.Where(c => c.CartId == ShoppingCartId);
+            var shoppingCart = await _db.Carts.Where(c => c.CartId == ShoppingCartId).ToListAsync();
 
             foreach (Cart item in shoppingCart)
             {
                 item.CartId = userName;
             }
-
         }
     }
 }
