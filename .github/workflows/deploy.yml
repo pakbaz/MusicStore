@@ -1,0 +1,166 @@
+name: Deploy to Azure Container Apps
+
+# Builds container images in ACR and rolls them out to Azure Container Apps.
+# - Pushes to `main` that touch a service folder build + deploy only that service.
+# - Manual runs (workflow_dispatch) let you pick web, musicgen, or both.
+# Auth is keyless via GitHub OIDC federated to a user-assigned managed identity
+# (id-musicstore-cicd). No registry passwords or client secrets are stored.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/MvcMusicStore/**'
+      - 'src/musicgen/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Which service to build and deploy'
+        type: choice
+        options:
+          - web
+          - musicgen
+          - both
+        default: web
+
+permissions:
+  id-token: write   # required for the OIDC token used by azure/login
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ACR_NAME: acr2ckube57vcipy
+  RESOURCE_GROUP: rg-musicstore
+  WEB_APP: ca-web-2ckube57vcipy
+  MUSICGEN_APP: ca-musicgen-2ckube57vcipy
+
+jobs:
+  detect:
+    name: Decide what to deploy
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.decide.outputs.web }}
+      musicgen: ${{ steps.decide.outputs.musicgen }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        if: github.event_name == 'push'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'src/MvcMusicStore/**'
+            musicgen:
+              - 'src/musicgen/**'
+
+      - name: Resolve deploy plan
+        id: decide
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SERVICE: ${{ github.event.inputs.service }}
+          FILTER_WEB: ${{ steps.filter.outputs.web }}
+          FILTER_MUSICGEN: ${{ steps.filter.outputs.musicgen }}
+        run: |
+          set -euo pipefail
+          web=false
+          musicgen=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            case "${INPUT_SERVICE:-web}" in
+              web) web=true ;;
+              musicgen) musicgen=true ;;
+              both) web=true; musicgen=true ;;
+            esac
+          else
+            [ "${FILTER_WEB:-false}" = "true" ] && web=true || true
+            [ "${FILTER_MUSICGEN:-false}" = "true" ] && musicgen=true || true
+          fi
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "musicgen=$musicgen" >> "$GITHUB_OUTPUT"
+          echo "Deploy plan -> web=$web musicgen=$musicgen (event=$EVENT_NAME)"
+
+  deploy-web:
+    name: Build & deploy web
+    needs: detect
+    if: needs.detect.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build image in ACR and update Container App
+        shell: bash
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt
+          TAG="v$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          echo "::group::az acr build web:$TAG"
+          az acr build \
+            --registry "$ACR_NAME" \
+            --image "web:$TAG" \
+            --image "web:latest" \
+            --platform linux/amd64 \
+            src/MvcMusicStore
+          echo "::endgroup::"
+          echo "Rolling out web:$TAG to $WEB_APP"
+          az containerapp update \
+            --name "$WEB_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$ACR_NAME.azurecr.io/web:$TAG"
+          FQDN=$(az containerapp show -n "$WEB_APP" -g "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "### Web deployed :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: \`web:$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: https://$FQDN" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-musicgen:
+    name: Build & deploy musicgen
+    needs: detect
+    if: needs.detect.outputs.musicgen == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build image in ACR and update Container App
+        shell: bash
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt
+          TAG="v$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          # The musicgen image bakes the ACE-Step model (~10GB) at build time,
+          # so this build takes ~10-15 min on ACR. Built in ACR (not the runner)
+          # for native linux/amd64 and adequate build disk.
+          echo "::group::az acr build musicgen:$TAG"
+          az acr build \
+            --registry "$ACR_NAME" \
+            --image "musicgen:$TAG" \
+            --image "musicgen:latest" \
+            --platform linux/amd64 \
+            src/musicgen
+          echo "::endgroup::"
+          echo "Rolling out musicgen:$TAG to $MUSICGEN_APP"
+          az containerapp update \
+            --name "$MUSICGEN_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$ACR_NAME.azurecr.io/musicgen:$TAG"
+          echo "### Musicgen deployed :musical_note:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: \`musicgen:$TAG\`" >> "$GITHUB_STEP_SUMMARY"
