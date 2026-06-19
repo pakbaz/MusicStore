@@ -11,6 +11,19 @@ builder.Services.AddHttpClient<IAlbumArtworkService, MusicBrainzAlbumArtworkServ
 {
     client.Timeout = TimeSpan.FromSeconds(10);
 });
+builder.Services.AddHttpClient<IAlbumMetadataService, MusicBrainzAlbumArtworkService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddHttpClient<IThumbnailCacheService, LocalThumbnailCacheService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.Configure<ThumbnailCacheOptions>(
+    builder.Configuration.GetSection(ThumbnailCacheOptions.SectionName));
+builder.Services.Configure<AlbumMetadataEnrichmentOptions>(
+    builder.Configuration.GetSection(AlbumMetadataEnrichmentOptions.SectionName));
+builder.Services.AddHostedService<AlbumMetadataEnrichmentWorker>();
 
 // Add Entity Framework - Music Store
 builder.Services.AddDbContext<MusicStoreEntities>(options =>
@@ -152,6 +165,8 @@ static async Task<bool> HasAlbumCatalogColumnsAsync(MusicStoreEntities dbContext
     await using var reader = await command.ExecuteReaderAsync();
     var hasReleaseDate = false;
     var hasIsAvailable = false;
+    var hasMetadataThumbnailUrl = false;
+    var hasUploadedThumbnailUrl = false;
     while (await reader.ReadAsync())
     {
         var columnName = reader.GetString(reader.GetOrdinal("name"));
@@ -163,7 +178,15 @@ static async Task<bool> HasAlbumCatalogColumnsAsync(MusicStoreEntities dbContext
         {
             hasIsAvailable = true;
         }
+        else if (string.Equals(columnName, "MetadataThumbnailUrl", StringComparison.OrdinalIgnoreCase))
+        {
+            hasMetadataThumbnailUrl = true;
+        }
+        else if (string.Equals(columnName, "UploadedThumbnailUrl", StringComparison.OrdinalIgnoreCase))
+        {
+            hasUploadedThumbnailUrl = true;
+        }
     }
 
-    return hasReleaseDate && hasIsAvailable;
+    return hasReleaseDate && hasIsAvailable && hasMetadataThumbnailUrl && hasUploadedThumbnailUrl;
 }

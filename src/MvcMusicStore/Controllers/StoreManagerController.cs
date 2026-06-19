@@ -15,6 +15,7 @@ namespace MvcMusicStore.Controllers
     {
         private readonly MusicStoreEntities db;
         private readonly IAlbumArtworkService albumArtworkService;
+        private readonly IThumbnailCacheService thumbnailCacheService;
         private readonly IWebHostEnvironment environment;
         private readonly ILogger<StoreManagerController> logger;
 
@@ -30,11 +31,13 @@ namespace MvcMusicStore.Controllers
         public StoreManagerController(
             MusicStoreEntities storeDb,
             IAlbumArtworkService albumArtworkService,
+            IThumbnailCacheService thumbnailCacheService,
             IWebHostEnvironment environment,
             ILogger<StoreManagerController> logger)
         {
             db = storeDb;
             this.albumArtworkService = albumArtworkService;
+            this.thumbnailCacheService = thumbnailCacheService;
             this.environment = environment;
             this.logger = logger;
         }
@@ -89,7 +92,7 @@ namespace MvcMusicStore.Controllers
                 {
                     album.UploadedThumbnailUrl = await SaveUploadedThumbnailAsync(thumbnailFile, cancellationToken);
                 }
-                else if (string.IsNullOrWhiteSpace(album.AlbumArtUrl))
+                else if (Album.IsPlaceholderThumbnailUrl(album.AlbumArtUrl))
                 {
                     album.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(album.ArtistId, album.Title, cancellationToken);
                 }
@@ -152,7 +155,7 @@ namespace MvcMusicStore.Controllers
                 }
                 else if (string.IsNullOrWhiteSpace(existingAlbum.UploadedThumbnailUrl) &&
                          string.IsNullOrWhiteSpace(existingAlbum.MetadataThumbnailUrl) &&
-                         string.IsNullOrWhiteSpace(existingAlbum.AlbumArtUrl))
+                         Album.IsPlaceholderThumbnailUrl(existingAlbum.AlbumArtUrl))
                 {
                     existingAlbum.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(existingAlbum.ArtistId, existingAlbum.Title, cancellationToken);
                 }
@@ -256,7 +259,8 @@ namespace MvcMusicStore.Controllers
 
             try
             {
-                return await albumArtworkService.TryGetThumbnailUrlAsync(artistName, albumTitle, cancellationToken);
+                var thumbnailUrl = await albumArtworkService.TryGetThumbnailUrlAsync(artistName, albumTitle, cancellationToken);
+                return await thumbnailCacheService.TryCacheThumbnailAsync(thumbnailUrl, cancellationToken);
             }
             catch (HttpRequestException ex)
             {

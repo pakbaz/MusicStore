@@ -70,7 +70,7 @@
             {
                 <li>
                     <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h2 class="h5">@album.Title</h2>
                     </a>
                     <small class="text-muted">@album.ArtistName</small>

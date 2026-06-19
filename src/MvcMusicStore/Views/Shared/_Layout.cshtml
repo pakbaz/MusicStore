@@ -120,6 +120,25 @@
             });
         }());
     </script>
+
+    <script>
+        (function () {
+            document.addEventListener("error", function (event) {
+                var target = event.target;
+                if (!target || target.tagName !== "IMG") {
+                    return;
+                }
+
+                var fallbackSrc = target.getAttribute("data-fallback-src");
+                if (!fallbackSrc || target.getAttribute("data-fallback-applied") === "true") {
+                    return;
+                }
+
+                target.setAttribute("data-fallback-applied", "true");
+                target.src = fallbackSrc;
+            }, true);
+        }());
+    </script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

@@ -70,7 +70,7 @@
                 @(item.IsFeatured ? "Yes" : "No")
             </td>
             <td>
-                <img alt="@item.Title thumbnail" src="@Url.Content(item.GetDisplayThumbnailUrl())" class="admin-thumbnail-list" />
+                <img alt="@item.Title thumbnail" src="@Url.Content(item.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" class="admin-thumbnail-list" />
             </td>
             <td>
                 @Html.ActionLink("Edit", "Edit", new { id = item.AlbumId }) |

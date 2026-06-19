@@ -30,7 +30,13 @@ namespace MvcMusicStore.Controllers
                     ArtistName = album.Artist!.Name ?? string.Empty,
                     GenreName = album.Genre!.Name ?? string.Empty,
                     Price = album.Price,
-                    AlbumArtUrl = string.IsNullOrEmpty(album.AlbumArtUrl) ? "~/Images/placeholder.png" : album.AlbumArtUrl,
+                    AlbumArtUrl = !string.IsNullOrEmpty(album.UploadedThumbnailUrl) && album.UploadedThumbnailUrl != Album.DefaultPlaceholderThumbnailUrl && album.UploadedThumbnailUrl != "~/Images/placeholder.png" && album.UploadedThumbnailUrl != "/Images/placeholder.png"
+                        ? album.UploadedThumbnailUrl
+                        : !string.IsNullOrEmpty(album.MetadataThumbnailUrl) && album.MetadataThumbnailUrl != Album.DefaultPlaceholderThumbnailUrl && album.MetadataThumbnailUrl != "~/Images/placeholder.png" && album.MetadataThumbnailUrl != "/Images/placeholder.png"
+                            ? album.MetadataThumbnailUrl
+                            : !string.IsNullOrEmpty(album.AlbumArtUrl) && album.AlbumArtUrl != Album.DefaultPlaceholderThumbnailUrl && album.AlbumArtUrl != "~/Images/placeholder.png" && album.AlbumArtUrl != "/Images/placeholder.png"
+                                ? album.AlbumArtUrl
+                                : Album.DefaultPlaceholderThumbnailUrl,
                     ReleaseDate = album.ReleaseDate,
                     IsAvailable = album.IsAvailable,
                     Popularity = album.OrderDetails!.Sum(orderDetail => (int?)orderDetail.Quantity) ?? 0
@@ -102,6 +108,12 @@ namespace MvcMusicStore.Controllers
                     .ToList(),
                 Albums = query.ToList()
             };
+
+            foreach (var album in catalogModel.Albums)
+            {
+                album.AlbumArtUrl = Album.NormalizeThumbnailUrl(album.AlbumArtUrl);
+            }
+
             catalogModel.TotalResults = catalogModel.Albums.Count;
 
             return View(catalogModel);

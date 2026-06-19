@@ -35,3 +35,5 @@ Packages/
 *.db
 *.db-shm
 *.db-wal
+src/MvcMusicStore/wwwroot/Images/MetadataCache/*
+!src/MvcMusicStore/wwwroot/Images/MetadataCache/.gitignore

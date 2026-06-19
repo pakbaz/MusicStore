@@ -13,7 +13,7 @@ namespace MvcMusicStore.Models
             if (await context.Genres.AnyAsync())
                 return;
 
-            const string imgUrl = "~/Images/placeholder.png";
+            const string imgUrl = "~/Images/placeholder.svg";
 
             var genres = AddGenres(context);
             var artists = AddArtists(context);

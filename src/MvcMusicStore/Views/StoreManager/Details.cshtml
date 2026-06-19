@@ -87,7 +87,7 @@
         </dt>
 
         <dd>
-            <img alt="@Model.Title thumbnail" src="@Url.Content(Model.GetDisplayThumbnailUrl())" class="admin-thumbnail-preview" />
+            <img alt="@Model.Title thumbnail" src="@Url.Content(Model.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" class="admin-thumbnail-preview" />
         </dd>
 
         <dt>
