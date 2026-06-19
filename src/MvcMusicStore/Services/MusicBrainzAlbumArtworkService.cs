@@ -1,10 +1,11 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace MvcMusicStore.Services;
 
-public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService
+public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService, IAlbumMetadataService
 {
     private const string MusicBrainzApiBaseUrl = "https://musicbrainz.org/ws/2/";
     private const string CoverArtArchiveBaseUrl = "https://coverartarchive.org/";
@@ -35,21 +36,28 @@ public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService
 
     public async Task<string?> TryGetThumbnailUrlAsync(string artistName, string albumTitle, CancellationToken cancellationToken = default)
     {
+        var metadata = await TryGetMetadataAsync(artistName, albumTitle, cancellationToken);
+        return metadata?.ThumbnailUrl;
+    }
+
+    public async Task<AlbumMetadataResult?> TryGetMetadataAsync(string artistName, string albumTitle, CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(artistName) || string.IsNullOrWhiteSpace(albumTitle))
         {
             return null;
         }
 
-        var releaseId = await TryGetReleaseIdAsync(artistName, albumTitle, cancellationToken);
-        if (releaseId is null)
+        var release = await TryGetReleaseAsync(artistName, albumTitle, cancellationToken);
+        if (release is null)
         {
             return null;
         }
 
-        return await TryGetCoverArtThumbnailAsync(releaseId, cancellationToken);
+        var thumbnailUrl = await TryGetCoverArtThumbnailAsync(release.ReleaseId, cancellationToken);
+        return new AlbumMetadataResult(thumbnailUrl, release.ReleaseDate);
     }
 
-    private async Task<string?> TryGetReleaseIdAsync(string artistName, string albumTitle, CancellationToken cancellationToken)
+    private async Task<MusicBrainzRelease?> TryGetReleaseAsync(string artistName, string albumTitle, CancellationToken cancellationToken)
     {
         var query = $"release:{albumTitle} AND artist:{artistName}";
         var url = $"release?query={Uri.EscapeDataString(query)}&fmt=json&limit=1";
@@ -72,12 +80,18 @@ public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService
         }
 
         var firstRelease = releases[0];
-        if (!firstRelease.TryGetProperty("id", out var idElement))
+        if (!firstRelease.TryGetProperty("id", out var idElement) || string.IsNullOrWhiteSpace(idElement.GetString()))
         {
             return null;
         }
 
-        return idElement.GetString();
+        DateTime? releaseDate = null;
+        if (firstRelease.TryGetProperty("date", out var dateElement))
+        {
+            releaseDate = ParseMusicBrainzDate(dateElement.GetString());
+        }
+
+        return new MusicBrainzRelease(idElement.GetString()!, releaseDate);
     }
 
     private async Task<string?> TryGetCoverArtThumbnailAsync(string releaseId, CancellationToken cancellationToken)
@@ -89,6 +103,7 @@ public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
+            logger.LogDebug("No Cover Art Archive image found for MusicBrainz release {ReleaseId}.", releaseId);
             return null;
         }
 
@@ -106,20 +121,47 @@ public sealed class MusicBrainzAlbumArtworkService : IAlbumArtworkService
         {
             if (thumbnails.TryGetProperty("small", out var smallThumbnail) && !string.IsNullOrWhiteSpace(smallThumbnail.GetString()))
             {
-                return smallThumbnail.GetString();
+                return NormalizeArtworkUrl(smallThumbnail.GetString()!);
             }
 
             if (thumbnails.TryGetProperty("large", out var largeThumbnail) && !string.IsNullOrWhiteSpace(largeThumbnail.GetString()))
             {
-                return largeThumbnail.GetString();
+                return NormalizeArtworkUrl(largeThumbnail.GetString()!);
             }
         }
 
         if (firstImage.TryGetProperty("image", out var fullImage) && !string.IsNullOrWhiteSpace(fullImage.GetString()))
         {
-            return fullImage.GetString();
+            return NormalizeArtworkUrl(fullImage.GetString()!);
         }
 
         return null;
     }
+
+    private static string NormalizeArtworkUrl(string artworkUrl)
+    {
+        return artworkUrl.StartsWith("http://coverartarchive.org/", StringComparison.OrdinalIgnoreCase)
+            ? "https://coverartarchive.org/" + artworkUrl["http://coverartarchive.org/".Length..]
+            : artworkUrl;
+    }
+
+    private static DateTime? ParseMusicBrainzDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        foreach (var format in new[] { "yyyy-MM-dd", "yyyy-MM", "yyyy" })
+        {
+            if (DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+            {
+                return parsedDate;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record MusicBrainzRelease(string ReleaseId, DateTime? ReleaseDate);
 }

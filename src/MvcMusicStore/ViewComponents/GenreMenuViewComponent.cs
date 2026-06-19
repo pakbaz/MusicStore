@@ -15,17 +15,18 @@ namespace MvcMusicStore.ViewComponents
             _db = db;
         }
 
-        public IViewComponentResult Invoke()
+        public async Task<IViewComponentResult> InvokeAsync()
         {
-            var genres = _db.Genres
-                .Include(g => g.Albums!)
-                .ThenInclude(a => a.OrderDetails!)
-                .AsEnumerable()
-                .OrderByDescending(g => g.Albums!.Sum(a => a.OrderDetails!.Sum(od => od.Quantity)))
+            // Cosmos DB does not support cross-container Include/aggregation, so the genre menu
+            // loads the (small) set of genres and orders them in memory instead.
+            var genres = await _db.Genres.ToListAsync();
+
+            var topGenres = genres
+                .OrderBy(g => g.Name)
                 .Take(9)
                 .ToList();
 
-            return View(genres);
+            return View(topGenres);
         }
     }
 }

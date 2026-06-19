@@ -24,12 +24,12 @@ namespace MvcMusicStore.Controllers
             _signInManager = signInManager;
         }
 
-        private void MigrateShoppingCart(string userName)
+        private async Task MigrateShoppingCartAsync(string userName)
         {
             var storeDb = HttpContext.RequestServices.GetRequiredService<MusicStoreEntities>();
             var cart = ShoppingCart.GetCart(storeDb, HttpContext);
-            cart.MigrateCart(userName);
-            storeDb.SaveChanges();
+            await cart.MigrateCartAsync(userName);
+            await storeDb.SaveChangesAsync();
             HttpContext.Session.SetString(ShoppingCart.CartSessionKey, userName);
         }
 
@@ -55,7 +55,7 @@ namespace MvcMusicStore.Controllers
                     model.UserName!, model.Password!, model.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
-                    MigrateShoppingCart(model.UserName!);
+                    await MigrateShoppingCartAsync(model.UserName!);
                     return RedirectToLocal(returnUrl);
                 }
                 else
@@ -90,7 +90,7 @@ namespace MvcMusicStore.Controllers
                 if (result.Succeeded)
                 {
                     await _signInManager.SignInAsync(user, isPersistent: false);
-                    MigrateShoppingCart(user.UserName!);
+                    await MigrateShoppingCartAsync(user.UserName!);
                     return RedirectToAction("Index", "Home");
                 }
                 else

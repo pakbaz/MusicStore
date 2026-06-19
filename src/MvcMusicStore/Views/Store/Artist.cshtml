@@ -19,7 +19,7 @@
             {
                 <li class="col-lg-2 col-md-3 col-sm-4 col-xs-6 container">
                     <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h5>@album.Title</h5>
                     </a>
                     <small class="text-muted">@album.Genre?.Name</small>
@@ -42,7 +42,7 @@
             {
                 <li class="col-md-3 col-sm-4 col-xs-6 container">
                     <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" />
+                        <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h5>@album.Title</h5>
                     </a>
                     <small class="text-muted">@album.Artist?.Name</small>

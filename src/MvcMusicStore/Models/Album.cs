@@ -6,7 +6,32 @@ using System.ComponentModel.DataAnnotations;
 namespace MvcMusicStore.Models
 {
     public class Album {
-        public const string DefaultPlaceholderThumbnailUrl = "~/Images/placeholder.png";
+        public const string DefaultPlaceholderThumbnailUrl = "~/Images/placeholder.svg";
+
+        public static bool IsPlaceholderThumbnailUrl(string? thumbnailUrl)
+        {
+            if (string.IsNullOrWhiteSpace(thumbnailUrl))
+            {
+                return true;
+            }
+
+            return string.Equals(thumbnailUrl, DefaultPlaceholderThumbnailUrl, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(thumbnailUrl, "~/Images/placeholder.png", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(thumbnailUrl, "/Images/placeholder.svg", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(thumbnailUrl, "/Images/placeholder.png", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string NormalizeThumbnailUrl(string? thumbnailUrl)
+        {
+            if (string.IsNullOrWhiteSpace(thumbnailUrl))
+            {
+                return DefaultPlaceholderThumbnailUrl;
+            }
+
+            return thumbnailUrl.StartsWith("http://coverartarchive.org/", StringComparison.OrdinalIgnoreCase)
+                ? "https://coverartarchive.org/" + thumbnailUrl["http://coverartarchive.org/".Length..]
+                : thumbnailUrl;
+        }
 
         [ScaffoldColumn(false)]
 
@@ -14,7 +39,13 @@ namespace MvcMusicStore.Models
 
         public int GenreId { get; set; }
 
+        [StringLength(120)]
+        public string? GenreName { get; set; }
+
         public int ArtistId { get; set; }
+
+        [StringLength(160)]
+        public string? ArtistName { get; set; }
 
         [Required]
         [StringLength(160, MinimumLength = 2)]
@@ -30,6 +61,10 @@ namespace MvcMusicStore.Models
         [StringLength(1024)]
         public string? AlbumArtUrl { get; set; }
 
+        [DisplayName("Audio URL")]
+        [StringLength(1024)]
+        public string? AudioUrl { get; set; }
+
         [DisplayName("Metadata Thumbnail URL")]
         [StringLength(1024)]
         public string? MetadataThumbnailUrl { get; set; }
@@ -40,20 +75,21 @@ namespace MvcMusicStore.Models
 
         public string GetDisplayThumbnailUrl()
         {
-            if (!string.IsNullOrWhiteSpace(UploadedThumbnailUrl))
+            if (!IsPlaceholderThumbnailUrl(UploadedThumbnailUrl))
             {
-                return UploadedThumbnailUrl;
+                return NormalizeThumbnailUrl(UploadedThumbnailUrl);
             }
 
-            if (!string.IsNullOrWhiteSpace(MetadataThumbnailUrl))
+            if (!IsPlaceholderThumbnailUrl(MetadataThumbnailUrl))
             {
-                return MetadataThumbnailUrl;
+                return NormalizeThumbnailUrl(MetadataThumbnailUrl);
             }
 
-            if (!string.IsNullOrWhiteSpace(AlbumArtUrl))
+            if (!IsPlaceholderThumbnailUrl(AlbumArtUrl))
             {
-                return AlbumArtUrl;
+                return NormalizeThumbnailUrl(AlbumArtUrl);
             }
+
             return DefaultPlaceholderThumbnailUrl;
         }
 

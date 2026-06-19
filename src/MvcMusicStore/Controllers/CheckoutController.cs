@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 
 namespace MvcMusicStore.Controllers
@@ -20,10 +21,10 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Checkout/
 
-        public IActionResult AddressAndPayment()
+        public async Task<IActionResult> AddressAndPayment()
         {
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-            if (cart.GetCount() == 0)
+            if (await cart.GetCountAsync() == 0)
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
@@ -36,7 +37,7 @@ namespace MvcMusicStore.Controllers
         // POST: /Checkout/AddressAndPayment
 
         [HttpPost]
-        public IActionResult AddressAndPayment(Order order)
+        public async Task<IActionResult> AddressAndPayment(Order order)
         {
             if (!ModelState.IsValid)
                 return View(order);
@@ -51,23 +52,24 @@ namespace MvcMusicStore.Controllers
             }
 
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-            if (cart.GetCount() == 0)
+            if (await cart.GetCountAsync() == 0)
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
             }
 
+            order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
+
+            // Process the order (builds embedded order details and empties the cart)
+            await cart.CreateOrderAsync(order);
 
             // Add the order
             storeDB.Orders.Add(order);
 
-            // Process the order
-            cart.CreateOrder(order);
-
             // Save all changes
-            storeDB.SaveChanges();
+            await storeDB.SaveChangesAsync();
 
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
@@ -75,12 +77,17 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Checkout/Complete
 
-        public IActionResult Complete(int id)
+        public async Task<IActionResult> Complete(int id)
         {
-            // Validate customer owns this order
-            bool isValid = storeDB.Orders.Any(
-                o => o.OrderId == id &&
-                o.Username == User.Identity!.Name);
+            // Validate customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS subquery),
+            // so materialize a single matching id with Take(1) instead.
+            IQueryable<Order> orders = storeDB.Orders;
+            var matchingOrder = await orders
+                .Where(o => o.OrderId == id && o.Username == User.Identity!.Name)
+                .Select(o => o.OrderId)
+                .Take(1)
+                .ToListAsync();
+            bool isValid = matchingOrder.Count != 0;
 
             if (isValid)
             {

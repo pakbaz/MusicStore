@@ -11,5 +11,9 @@ namespace MvcMusicStore.Services
         public required string OriginalityStatement { get; init; }
 
         public decimal SuggestedPrice { get; init; }
+
+        public string? AudioUrl { get; init; }
+
+        public int DurationSeconds { get; init; }
     }
 }

@@ -6,6 +6,6 @@ namespace MvcMusicStore.Services
 
         public decimal DefaultPrice { get; set; } = 8.99M;
 
-        public string PlaceholderAlbumArtUrl { get; set; } = "~/Images/placeholder.png";
+        public string PlaceholderAlbumArtUrl { get; set; } = "~/Images/placeholder.svg";
     }
 }

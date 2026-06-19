@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.ViewModels;
 
@@ -17,15 +18,15 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /ShoppingCart/
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
             // Set up our ViewModel
             var viewModel = new ShoppingCartViewModel
             {
-                CartItems = cart.GetCartItems(),
-                CartTotal = cart.GetTotal()
+                CartItems = await cart.GetCartItemsAsync(),
+                CartTotal = await cart.GetTotalAsync()
             };
 
             ViewBag.CartMessage = TempData["CartMessage"];
@@ -37,19 +38,18 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /ShoppingCart/AddToCart/5
 
-        public IActionResult AddToCart(int id)
+        public async Task<IActionResult> AddToCart(int id)
         {
-
             // Retrieve the album from the database
-            var addedAlbum = storeDB.Albums
-                .Single(album => album.AlbumId == id);
+            var addedAlbum = await storeDB.Albums
+                .SingleAsync(album => album.AlbumId == id);
 
             // Add it to the shopping cart
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
-            cart.AddToCart(addedAlbum);
+            await cart.AddToCartAsync(addedAlbum);
 
-            storeDB.SaveChanges();
+            await storeDB.SaveChangesAsync();
 
             // Go back to the main store page for more shopping
             return RedirectToAction("Index");
@@ -59,12 +59,12 @@ namespace MvcMusicStore.Controllers
         // AJAX: /ShoppingCart/RemoveFromCart/5
 
         [HttpPost]
-        public IActionResult RemoveFromCart(int id)
+        public async Task<IActionResult> RemoveFromCart(int id)
         {
             // Retrieve the current user's shopping cart
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
 
-            var cartItem = cart.GetCartItems().SingleOrDefault(item => item.RecordId == id);
+            var cartItem = (await cart.GetCartItemsAsync()).SingleOrDefault(item => item.RecordId == id);
             if (cartItem == null)
             {
                 return NotFound("Cart item not found.");
@@ -73,9 +73,9 @@ namespace MvcMusicStore.Controllers
             var albumName = cartItem.Album?.Title ?? "This album";
 
             // Remove from cart
-            int itemCount = cart.RemoveFromCart(id);
+            int itemCount = await cart.RemoveFromCartAsync(id);
 
-            storeDB.SaveChanges();
+            await storeDB.SaveChangesAsync();
 
             var itemSubtotal = itemCount > 0
                 ? (cartItem.Album?.Price ?? decimal.Zero) * itemCount
@@ -85,11 +85,11 @@ namespace MvcMusicStore.Controllers
                 ? $"1 copy of {albumName} has been removed from your shopping cart."
                 : $"{albumName} has been removed from your shopping cart.";
 
-            return Json(BuildCartResponse(cart, id, itemCount, itemSubtotal, message));
+            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
         }
 
         [HttpPost]
-        public IActionResult UpdateCart(int id, int count)
+        public async Task<IActionResult> UpdateCart(int id, int count)
         {
             if (count < 0)
             {
@@ -97,7 +97,7 @@ namespace MvcMusicStore.Controllers
             }
 
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-            var cartItem = cart.GetCartItems().SingleOrDefault(item => item.RecordId == id);
+            var cartItem = (await cart.GetCartItemsAsync()).SingleOrDefault(item => item.RecordId == id);
 
             if (cartItem == null)
             {
@@ -106,21 +106,21 @@ namespace MvcMusicStore.Controllers
 
             var albumName = cartItem.Album?.Title ?? "This album";
             var unitPrice = cartItem.Album?.Price ?? decimal.Zero;
-            var itemCount = cart.UpdateCartItemCount(id, count);
+            var itemCount = await cart.UpdateCartItemCountAsync(id, count);
 
-            storeDB.SaveChanges();
+            await storeDB.SaveChangesAsync();
 
             var itemSubtotal = unitPrice * itemCount;
             var message = itemCount == 0
                 ? $"{albumName} has been removed from your shopping cart."
                 : $"{albumName} quantity has been updated to {itemCount}.";
 
-            return Json(BuildCartResponse(cart, id, itemCount, itemSubtotal, message));
+            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
         }
 
-        private ShoppingCartRemoveViewModel BuildCartResponse(ShoppingCart cart, int id, int itemCount, decimal itemSubtotal, string message)
+        private async Task<ShoppingCartRemoveViewModel> BuildCartResponseAsync(ShoppingCart cart, int id, int itemCount, decimal itemSubtotal, string message)
         {
-            var cartItems = cart.GetCartItems()
+            var cartItems = (await cart.GetCartItemsAsync())
                 .Where(item => item.Album != null)
                 .OrderBy(item => item.Album!.Title)
                 .ToList();
@@ -130,8 +130,8 @@ namespace MvcMusicStore.Controllers
             return new ShoppingCartRemoveViewModel
             {
                 Message = message,
-                CartTotal = cart.GetTotal(),
-                CartCount = cart.GetCount(),
+                CartTotal = await cart.GetTotalAsync(),
+                CartCount = await cart.GetCountAsync(),
                 ItemCount = itemCount,
                 ItemSubtotal = itemSubtotal,
                 CartSummary = cartSummary,

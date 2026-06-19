@@ -16,6 +16,20 @@
         <p><strong>Instrumentation:</strong> @Model.Instrumentation</p>
         <p><strong>Tempo:</strong> @Model.TempoBpm BPM</p>
         <p><strong>Price:</strong> @Model.SuggestedPrice.ToString("C")</p>
+        @if (!string.IsNullOrWhiteSpace(Model.AudioUrl))
+        {
+            <div class="ai-music-player">
+                <p><strong>Preview@(Model.DurationSeconds > 0 ? $" ({Model.DurationSeconds}s)" : string.Empty):</strong></p>
+                <audio controls preload="none" src="@Model.AudioUrl">
+                    Your browser does not support the audio element.
+                </audio>
+                <p><a href="@Model.AudioUrl" download class="btn btn-default btn-sm">Download track</a></p>
+            </div>
+        }
+        else
+        {
+            <p class="alert alert-warning">Audio is still being generated or the generation service was unavailable. The track metadata has been saved to the catalog.</p>
+        }
         <p class="alert alert-info">@Model.OriginalityStatement</p>
     </div>
 </div>

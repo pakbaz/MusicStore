@@ -48,7 +48,7 @@ namespace MvcMusicStore.ViewModels
         public string ArtistName { get; set; } = string.Empty;
         public string GenreName { get; set; } = string.Empty;
         public decimal Price { get; set; }
-        public string AlbumArtUrl { get; set; } = "~/Images/placeholder.png";
+        public string AlbumArtUrl { get; set; } = "~/Images/placeholder.svg";
         public DateTime? ReleaseDate { get; set; }
         public bool IsAvailable { get; set; }
         public int Popularity { get; set; }

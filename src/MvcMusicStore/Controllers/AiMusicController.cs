@@ -1,6 +1,8 @@
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
@@ -49,54 +51,70 @@ namespace MvcMusicStore.Controllers
         }
 
         [HttpGet]
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             var model = new AiMusicGenerationRequestViewModel();
-            PopulateSelectionLists(model);
+            await PopulateSelectionListsAsync(model);
             return View(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Index(AiMusicGenerationRequestViewModel model)
+        public async Task<IActionResult> Index(AiMusicGenerationRequestViewModel model, CancellationToken cancellationToken)
         {
-            Genre? genre = db.Genres.SingleOrDefault(g => g.GenreId == model.GenreId);
+            Genre? genre = await db.Genres.SingleOrDefaultAsync(g => g.GenreId == model.GenreId, cancellationToken);
             if (genre == null)
             {
                 ModelState.AddModelError(nameof(model.GenreId), "Please choose a valid genre.");
             }
 
+            ValidateSelection(ModelState, model.StyleDirection, StyleDirections, nameof(model.StyleDirection), "Please choose a valid style direction.");
+            ValidateSelection(ModelState, model.Mood, MoodOptions, nameof(model.Mood), "Please choose a valid mood.");
+            ValidateSelection(ModelState, model.Instrumentation, InstrumentationOptions, nameof(model.Instrumentation), "Please choose valid instrumentation.");
+
             if (!ModelState.IsValid)
             {
-                PopulateSelectionLists(model);
+                await PopulateSelectionListsAsync(model);
                 return View(model);
             }
 
             try
             {
-                AiMusicCreationResult generationResult = aiMusicCreationService.Generate(new AiMusicCreationRequest
+                AiMusicCreationResult generationResult = await aiMusicCreationService.GenerateAsync(new AiMusicCreationRequest
                 {
                     GenreName = genre!.Name!,
                     StyleDirection = model.StyleDirection!,
                     Mood = model.Mood!,
                     Instrumentation = model.Instrumentation!,
                     TempoBpm = model.TempoBpm
-                });
+                }, cancellationToken);
 
-                Artist artist = db.Artists.SingleOrDefault(a => a.Name == generationResult.ArtistName)
-                    ?? db.Artists.Add(new Artist { Name = generationResult.ArtistName }).Entity;
+                Artist? artist = await db.Artists.SingleOrDefaultAsync(a => a.Name == generationResult.ArtistName, cancellationToken);
+                if (artist == null)
+                {
+                    artist = new Artist
+                    {
+                        ArtistId = await db.NextArtistIdAsync(cancellationToken),
+                        Name = generationResult.ArtistName
+                    };
+                    db.Artists.Add(artist);
+                }
 
                 Album album = new()
                 {
+                    AlbumId = await db.NextAlbumIdAsync(cancellationToken),
                     Title = generationResult.Title,
                     GenreId = model.GenreId,
-                    Artist = artist,
+                    GenreName = genre.Name,
+                    ArtistId = artist.ArtistId,
+                    ArtistName = artist.Name,
                     Price = generationResult.SuggestedPrice,
-                    AlbumArtUrl = generationResult.AlbumArtUrl
+                    AlbumArtUrl = generationResult.AlbumArtUrl,
+                    AudioUrl = generationResult.AudioUrl
                 };
 
                 db.Albums.Add(album);
-                db.SaveChanges();
+                await db.SaveChangesAsync(cancellationToken);
 
                 return View("Result", new AiMusicGenerationResultViewModel
                 {
@@ -109,20 +127,23 @@ namespace MvcMusicStore.Controllers
                     Title = generationResult.Title,
                     ArtistName = generationResult.ArtistName,
                     SuggestedPrice = generationResult.SuggestedPrice,
-                    OriginalityStatement = generationResult.OriginalityStatement
+                    OriginalityStatement = generationResult.OriginalityStatement,
+                    AudioUrl = generationResult.AudioUrl,
+                    DurationSeconds = generationResult.DurationSeconds
                 });
             }
             catch (InvalidOperationException ex)
             {
                 ModelState.AddModelError(nameof(model.StyleDirection), ex.Message);
-                PopulateSelectionLists(model);
+                await PopulateSelectionListsAsync(model);
                 return View(model);
             }
         }
 
-        private void PopulateSelectionLists(AiMusicGenerationRequestViewModel model)
+        private async Task PopulateSelectionListsAsync(AiMusicGenerationRequestViewModel model)
         {
-            model.Genres = db.Genres
+            var genres = await db.Genres.ToListAsync();
+            model.Genres = genres
                 .OrderBy(g => g.Name)
                 .Select(g => new SelectListItem
                 {
@@ -147,6 +168,19 @@ namespace MvcMusicStore.Controllers
                     Selected = string.Equals(v, selectedValue, StringComparison.Ordinal)
                 })
                 .ToList();
+        }
+
+        private static void ValidateSelection(ModelStateDictionary modelState, string? value, IEnumerable<string> validValues, string key, string errorMessage)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            if (!validValues.Contains(value, StringComparer.Ordinal))
+            {
+                modelState.AddModelError(key, errorMessage);
+            }
         }
     }
 }

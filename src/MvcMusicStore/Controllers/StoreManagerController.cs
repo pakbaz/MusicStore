@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +15,7 @@ namespace MvcMusicStore.Controllers
     {
         private readonly MusicStoreEntities db;
         private readonly IAlbumArtworkService albumArtworkService;
+        private readonly IThumbnailCacheService thumbnailCacheService;
         private readonly IWebHostEnvironment environment;
         private readonly ILogger<StoreManagerController> logger;
 
@@ -30,11 +31,13 @@ namespace MvcMusicStore.Controllers
         public StoreManagerController(
             MusicStoreEntities storeDb,
             IAlbumArtworkService albumArtworkService,
+            IThumbnailCacheService thumbnailCacheService,
             IWebHostEnvironment environment,
             ILogger<StoreManagerController> logger)
         {
             db = storeDb;
             this.albumArtworkService = albumArtworkService;
+            this.thumbnailCacheService = thumbnailCacheService;
             this.environment = environment;
             this.logger = logger;
         }
@@ -44,9 +47,9 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Index()
         {
-            var albums = db.Albums.Include(a => a.Genre).Include(a => a.Artist)
-                .OrderBy(a => a.Price);
-            return View(await albums.ToListAsync());
+            var albums = await db.Albums.ToListAsync();
+            albums.PopulateNavigation();
+            return View(albums.OrderBy(a => a.Price).ToList());
         }
 
         //
@@ -54,24 +57,21 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Details(int id = 0)
         {
-            Album? album = await db.Albums
-                .Include(a => a.Artist)
-                .Include(a => a.Genre)
-                .SingleOrDefaultAsync(a => a.AlbumId == id);
+            Album? album = await db.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
             }
+            album.PopulateNavigation();
             return View(album);
         }
 
         //
         // GET: /StoreManager/Create
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Genres, "GenreId", "Name");
-            ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Artists, "ArtistId", "Name");
+            await PopulateSelectListsAsync();
             return View();
         }
 
@@ -89,18 +89,20 @@ namespace MvcMusicStore.Controllers
                 {
                     album.UploadedThumbnailUrl = await SaveUploadedThumbnailAsync(thumbnailFile, cancellationToken);
                 }
-                else if (string.IsNullOrWhiteSpace(album.AlbumArtUrl))
+                else if (Album.IsPlaceholderThumbnailUrl(album.AlbumArtUrl))
                 {
                     album.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(album.ArtistId, album.Title, cancellationToken);
                 }
+
+                album.AlbumId = await db.NextAlbumIdAsync(cancellationToken);
+                await ApplyDenormalizedNamesAsync(album, cancellationToken);
 
                 db.Albums.Add(album);
                 await db.SaveChangesAsync(cancellationToken);
                 return RedirectToAction("Index");
             }
 
-            ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Genres, "GenreId", "Name", album.GenreId);
-            ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Artists, "ArtistId", "Name", album.ArtistId);
+            await PopulateSelectListsAsync(album.GenreId, album.ArtistId);
             return View(album);
         }
 
@@ -109,13 +111,12 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Edit(int id = 0)
         {
-            Album? album = await db.Albums.FindAsync(id);
+            Album? album = await db.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
             }
-            ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Genres, "GenreId", "Name", album.GenreId);
-            ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Artists, "ArtistId", "Name", album.ArtistId);
+            await PopulateSelectListsAsync(album.GenreId, album.ArtistId);
             return View(album);
         }
 
@@ -130,7 +131,7 @@ namespace MvcMusicStore.Controllers
                 return BadRequest();
             }
 
-            var existingAlbum = await db.Albums.FindAsync(id);
+            var existingAlbum = await db.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
             if (existingAlbum == null)
             {
                 return NotFound();
@@ -152,17 +153,17 @@ namespace MvcMusicStore.Controllers
                 }
                 else if (string.IsNullOrWhiteSpace(existingAlbum.UploadedThumbnailUrl) &&
                          string.IsNullOrWhiteSpace(existingAlbum.MetadataThumbnailUrl) &&
-                         string.IsNullOrWhiteSpace(existingAlbum.AlbumArtUrl))
+                         Album.IsPlaceholderThumbnailUrl(existingAlbum.AlbumArtUrl))
                 {
                     existingAlbum.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(existingAlbum.ArtistId, existingAlbum.Title, cancellationToken);
                 }
 
+                await ApplyDenormalizedNamesAsync(existingAlbum, cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
                 return RedirectToAction("Index");
             }
 
-            ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Genres, "GenreId", "Name", album.GenreId);
-            ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(db.Artists, "ArtistId", "Name", album.ArtistId);
+            await PopulateSelectListsAsync(album.GenreId, album.ArtistId);
             return View(album);
         }
 
@@ -171,14 +172,12 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Delete(int id = 0)
         {
-            Album? album = await db.Albums
-                .Include(a => a.Artist)
-                .Include(a => a.Genre)
-                .SingleOrDefaultAsync(a => a.AlbumId == id);
+            Album? album = await db.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
             if (album == null)
             {
                 return NotFound();
             }
+            album.PopulateNavigation();
             return View(album);
         }
 
@@ -188,13 +187,29 @@ namespace MvcMusicStore.Controllers
         [HttpPost, ActionName("Delete")]
         public async Task<IActionResult> DeleteConfirmed(int id, CancellationToken cancellationToken)
         {
-            Album? album = await db.Albums.FindAsync(id);
+            Album? album = await db.Albums.SingleOrDefaultAsync(a => a.AlbumId == id, cancellationToken);
             if (album != null)
             {
                 db.Albums.Remove(album);
                 await db.SaveChangesAsync(cancellationToken);
             }
             return RedirectToAction("Index");
+        }
+
+        private async Task PopulateSelectListsAsync(int? genreId = null, int? artistId = null)
+        {
+            var genres = (await db.Genres.ToListAsync()).OrderBy(g => g.Name).ToList();
+            var artists = (await db.Artists.ToListAsync()).OrderBy(a => a.Name).ToList();
+            ViewBag.GenreId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(genres, "GenreId", "Name", genreId);
+            ViewBag.ArtistId = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(artists, "ArtistId", "Name", artistId);
+        }
+
+        private async Task ApplyDenormalizedNamesAsync(Album album, CancellationToken cancellationToken)
+        {
+            var genre = await db.Genres.SingleOrDefaultAsync(g => g.GenreId == album.GenreId, cancellationToken);
+            var artist = await db.Artists.SingleOrDefaultAsync(a => a.ArtistId == album.ArtistId, cancellationToken);
+            album.GenreName = genre?.Name;
+            album.ArtistName = artist?.Name;
         }
 
         private static string ResolveImageExtension(IFormFile thumbnailFile)
@@ -256,7 +271,8 @@ namespace MvcMusicStore.Controllers
 
             try
             {
-                return await albumArtworkService.TryGetThumbnailUrlAsync(artistName, albumTitle, cancellationToken);
+                var thumbnailUrl = await albumArtworkService.TryGetThumbnailUrlAsync(artistName, albumTitle, cancellationToken);
+                return await thumbnailCacheService.TryCacheThumbnailAsync(thumbnailUrl, cancellationToken);
             }
             catch (HttpRequestException ex)
             {

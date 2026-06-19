@@ -2,6 +2,6 @@ namespace MvcMusicStore.Services
 {
     public interface IAiMusicCreationService
     {
-        AiMusicCreationResult Generate(AiMusicCreationRequest request);
+        Task<AiMusicCreationResult> GenerateAsync(AiMusicCreationRequest request, CancellationToken cancellationToken = default);
     }
 }
