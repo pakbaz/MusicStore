@@ -145,6 +145,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   properties: {
     databaseAccountOfferType: 'Standard'
     enableFreeTier: cosmosEnableFreeTier
+    publicNetworkAccess: 'Enabled'
     capabilities: [
       {
         name: 'EnableServerless'
