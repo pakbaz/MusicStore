@@ -2,7 +2,7 @@
 
 An upgraded ASP.NET Core MVC version of the classic MVC Music Store sample, running on .NET 10 with Azure Cosmos DB, private Azure Blob Storage media, ASP.NET Core Identity, and an optional ACE-Step text-to-music generation service.
 
-The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, verified-purchaser ratings and reviews, administration, sign-in, shopping cart, checkout, digital gift cards and album gifting, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
+The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, verified-purchaser ratings and reviews, administration, sign-in, shopping cart, checkout, a loyalty rewards and referral program, digital gift cards and album gifting, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
 
 ## Screenshots
 
@@ -39,6 +39,8 @@ flowchart LR
         AiService[AceStepMusicCreationService]
         ThumbnailCache[BlobThumbnailCacheService]
         MusicBrainz[MusicBrainz and Cover Art Archive client]
+        StoreEmail[StoreEmailService and IEmailSender]
+        CartReminder[Abandoned-cart reminder worker]
     end
 
     Web --> Controllers
@@ -52,6 +54,10 @@ flowchart LR
     Controllers --> MediaProxy
     MetadataWorker --> MusicBrainz
     MetadataWorker --> ThumbnailCache
+    Controllers --> StoreEmail
+    CartReminder --> StoreEmail
+    CartReminder --> StoreDb
+    StoreEmail --> Acs[Azure Communication Services Email]
 
     StoreDb --> Cosmos[(Azure Cosmos DB SQL API)]
     IdentityDb --> Cosmos
@@ -73,6 +79,7 @@ flowchart LR
     ACA --> MusicGen
     MI --> Cosmos
     MI --> Blob
+    MI --> Acs
     Logs --> ACA
 ```
 
@@ -87,8 +94,10 @@ flowchart LR
 | Gift cards and gifting | `GiftCardController`, `GiftController`, `GiftCardService`, `LoggingEmailSender` | Buy digital gift cards delivered to a recipient by email, redeem balances at checkout, and send albums as a redeemable gift link. Email delivery is simulated through `IEmailSender`. |
 | Administration | `StoreManagerController` | Administrator-only CRUD for albums plus custom thumbnail uploads and metadata artwork lookup. |
 | Authentication | `AccountController`, `ApplicationDbContext` | ASP.NET Core Identity users, roles, claims, logins, and tokens stored in Cosmos containers. |
+| Loyalty &amp; referrals | `LoyaltyService`, `CheckoutController`, `AccountController`, `LoyaltySummaryViewComponent` | Points earned per purchase with tiered earn multipliers by lifetime spend, points redeemed for a checkout discount, a `/Account/Rewards` dashboard, and a referral program that rewards both parties after the referred customer's first purchase. |
 | Media | `MediaController` | Streams private Blob Storage thumbnails and generated music through `/media/thumbnails/...` and `/media/music/...`. |
 | Metadata enrichment | `AlbumMetadataEnrichmentWorker`, `MusicBrainzAlbumArtworkService` | Periodically enriches albums with release dates and cached cover art from MusicBrainz and Cover Art Archive. |
+| Email and cart recovery | `StoreEmailService`, `EmailTemplateService`, `IEmailSender` (`AcsEmailSender`/`LoggingEmailSender`), `AbandonedCartReminderWorker` | Sends transactional order receipts, recovers abandoned carts for opted-in signed-in users, and honors marketing consent and unsubscribe. |
 | AI Music | `AiMusicController`, `AceStepMusicCreationService`, `AiMusicJobStore` | Starts asynchronous generation jobs, polls job status, calls musicgen, uploads MP3 output to Blob Storage, and inserts the generated track as a catalog album. |
 | Music generation | `src/musicgen/app.py` | FastAPI service that loads ACE-Step 1.5, generates MP3 audio from a prompt, and returns base64 audio to the web app. |
 
@@ -102,6 +111,8 @@ The application uses EF Core's Azure Cosmos DB provider for both catalog data an
 | Identity | `Identity_Users`, `Identity_Roles`, `Identity_UserClaims`, `Identity_UserRoles`, `Identity_UserLogins`, `Identity_RoleClaims`, `Identity_UserTokens` |
 
 Catalog entities denormalize display fields such as artist name, genre name, album art URL, release date, availability, and generated audio URL so storefront pages can render from Cosmos without relational joins. Orders own their order details as embedded data, and gift cards own their transaction history the same way. Gift cards and album gifts carry their own redeemable code or token plus running balance and redemption state.
+
+`Identity_Users` records also carry loyalty state (points balance, lifetime spend, lifetime points earned, tier eligibility, referral code, and referred-by code), and `Orders` record any points redeemed, the loyalty discount applied, and points earned. The loyalty economy (earn rate, redemption rate, tier thresholds, and referral rewards) is configured under the `Loyalty` section of `appsettings.json`.
 
 ### Media and thumbnail flow
 
@@ -124,6 +135,58 @@ Metadata thumbnails and generated MP3 files are stored in private Blob Storage c
 6. The web app uploads the MP3 to the `music` blob container.
 7. A new `Album` and, when needed, `Artist` are saved to Cosmos.
 8. The browser polls `AiMusicController.Status` until it receives the catalog album ID and audio URL.
+
+### Email and cart recovery
+
+The store sends transactional and (opt-in) marketing email through a pluggable `IEmailSender`:
+
+- **Order receipts (transactional).** On a successful checkout, `CheckoutController` calls
+  `StoreEmailService.SendOrderConfirmationAsync`, which renders an itemized receipt to the order's
+  email address. Receipts are always sent and do not require marketing consent.
+- **Abandoned-cart recovery.** `AbandonedCartReminderWorker` periodically scans the `Carts`
+  container. A cart owned by a signed-in user (its `CartId` equals the username) whose newest item
+  has been untouched longer than `AbandonedCart:ReminderAfterMinutes` is eligible. If the user has
+  an email address and has not opted out, a reminder — optionally including an incentive code — is
+  sent. A per-user signature plus `AbandonedCart:ResendAfterHours` prevents duplicate nudges for an
+  unchanged cart. Anonymous (GUID) carts are ignored.
+- **Opt-in marketing and consent.** Registration captures an email address and a newsletter opt-in.
+  Consent flags (`EmailMarketingOptIn`, `AbandonedCartOptIn`) and a stable `UnsubscribeToken` live on
+  `ApplicationUser`. Users manage choices at `/Account/EmailPreferences`, and every non-transactional
+  email includes a one-click `/Account/Unsubscribe` link that honors the request.
+
+Delivery is selected by `Email:Provider`:
+
+- `Log` (default) — `LoggingEmailSender` logs each message and, when `Email:LogDirectory` is set,
+  writes the rendered HTML to disk. No credentials required, so the app runs anywhere.
+- `Acs` — `AcsEmailSender` sends through Azure Communication Services Email using a connection string
+  or the resource endpoint with the shared managed identity.
+
+| Setting | Purpose |
+| --- | --- |
+| `Email:Enabled` | Master switch; when false, no email is dispatched. |
+| `Email:Provider` | `Log` (default) or `Acs`. |
+| `Email:FromAddress` / `Email:FromName` | Sender identity (must be a verified ACS sender in production). |
+| `Email:ConnectionString` / `Email:Endpoint` | ACS connection string, or resource endpoint for managed identity. |
+| `Email:BaseUrl` | Public site URL used to build absolute links (unsubscribe, cart). Set automatically in Azure. |
+| `Email:LogDirectory` | Optional folder for the log sender to persist rendered emails (dev). |
+| `AbandonedCart:Enabled` | Enables the reminder worker (disabled in Development). |
+| `AbandonedCart:ReminderAfterMinutes` | Cart inactivity before it is considered abandoned. |
+| `AbandonedCart:ResendAfterHours` | Minimum gap before re-reminding an unchanged cart. |
+| `AbandonedCart:IncentiveCode` | Optional promo code surfaced in the reminder. |
+| `AbandonedCart:ScanIntervalMinutes` / `AbandonedCart:BatchSize` / `AbandonedCart:StartupDelaySeconds` | Worker scheduling and throughput. |
+
+In Development the log provider is used and the reminder worker is disabled, so checkout receipts
+are written to `App_Data/sent-emails` for inspection without sending real mail.
+
+To enable real delivery in Azure (manual, one-time):
+
+1. Create an Azure Communication Services resource and an Email Communication Service with a managed
+   or custom domain, then note a verified sender address (e.g. `DoNotReply@<your-domain>`).
+2. Grant the web app's managed identity an ACS sender role on the resource (or supply a connection
+   string via a Container Apps secret).
+3. Set `Email__Provider=Acs`, `Email__FromAddress`, and `Email__Endpoint` (or
+   `Email__ConnectionString`) on the web Container App. `Email__BaseUrl` is already wired from the
+   app's public FQDN.
 
 ## Running locally
 
@@ -173,7 +236,7 @@ The `infra` folder provisions:
 - Log Analytics workspace.
 - Role assignments for ACR pull, Cosmos data contributor, and Storage Blob Data Contributor.
 
-The web container receives Cosmos endpoint, storage blob endpoint, container names, musicgen internal URL, managed identity client ID, and admin credentials through Container Apps environment variables and secrets. The musicgen container is internal-only and is called by the web app inside the Container Apps environment.
+The web container receives Cosmos endpoint, storage blob endpoint, container names, musicgen internal URL, managed identity client ID, and admin credentials through Container Apps environment variables and secrets. The web container also receives `Email__BaseUrl` (its own public URL) so email links resolve; enabling real email delivery is a separate manual step (set `Email__Provider=Acs` plus the ACS sender settings — see [Email and cart recovery](#email-and-cart-recovery)). The musicgen container is internal-only and is called by the web app inside the Container Apps environment.
 
 `azure.yaml` defines both deployable services:
 

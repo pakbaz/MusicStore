@@ -7,6 +7,31 @@ namespace MvcMusicStore.Models
     // You can add profile data for the user by adding more properties to your ApplicationUser class.
     public class ApplicationUser : Microsoft.AspNetCore.Identity.IdentityUser
     {
+        /// <summary>Consent for newsletter / new-release marketing email. Opt-in (defaults to false).</summary>
+        public bool EmailMarketingOptIn { get; set; }
+
+        /// <summary>Whether abandoned-cart reminder emails are allowed. Opt-out (defaults to true).</summary>
+        public bool AbandonedCartOptIn { get; set; } = true;
+
+        /// <summary>Stable token embedded in one-click unsubscribe links.</summary>
+        public string? UnsubscribeToken { get; set; }
+
+        /// <summary>Timestamp of the last abandoned-cart reminder sent to this user (UTC).</summary>
+        public DateTime? LastAbandonedCartReminderUtc { get; set; }
+
+        /// <summary>Signature of the cart contents at the last reminder, used to avoid duplicate nudges.</summary>
+        public string? LastRemindedCartSignature { get; set; }
+
+        // Loyalty rewards state.
+        public int LoyaltyPoints { get; set; }
+        public decimal LifetimeSpend { get; set; }
+        public int LifetimePointsEarned { get; set; }
+        public bool HasMadePurchase { get; set; }
+
+        // Referral program state.
+        public string? ReferralCode { get; set; }
+        public string? ReferredByCode { get; set; }
+        public bool ReferralRewardGranted { get; set; }
     }
 
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>

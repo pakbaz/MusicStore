@@ -1,5 +1,6 @@
 using Azure.Core;
 using Azure.Identity;
+using Azure.Communication.Email;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,11 @@ builder.Services.Configure<StorageOptions>(
     builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.Configure<MusicGenOptions>(
     builder.Configuration.GetSection(MusicGenOptions.SectionName));
+
+// Loyalty rewards + referral program.
+builder.Services.Configure<LoyaltyOptions>(
+    builder.Configuration.GetSection(LoyaltyOptions.SectionName));
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 
 // Shared managed-identity credential. A single instance is reused for Blob Storage and both
 // Cosmos DbContexts so EF Core caches one internal service provider instead of building a new
@@ -118,17 +124,49 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
     client.Timeout = TimeSpan.FromSeconds(timeoutSeconds <= 0 ? 600 : timeoutSeconds);
 });
 
-// Order confirmation email. The default sender logs the rendered receipt; swap this
-// registration for an SMTP-backed IOrderEmailSender to deliver real mail.
-builder.Services.Configure<EmailOptions>(
-    builder.Configuration.GetSection(EmailOptions.SectionName));
-builder.Services.AddScoped<IOrderEmailSender, LoggingOrderEmailSender>();
-
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
-// Gift cards and gifting: simulated email delivery + gift-card issuance/redemption.
-builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+// Email: transactional receipts + abandoned-cart recovery + opt-in marketing.
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<AbandonedCartOptions>(
+    builder.Configuration.GetSection(AbandonedCartOptions.SectionName));
+
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.UsesAcs)
+{
+    // Azure Communication Services Email. Local/dev may use a connection string; Azure uses the
+    // resource endpoint with the shared managed-identity credential.
+    builder.Services.AddSingleton(sp =>
+    {
+        var options = sp.GetRequiredService<IOptions<EmailOptions>>().Value;
+        if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            return new EmailClient(options.ConnectionString);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Endpoint))
+        {
+            return new EmailClient(new Uri(options.Endpoint), azureCredential);
+        }
+
+        throw new InvalidOperationException(
+            "Email:ConnectionString or Email:Endpoint must be configured when Email:Provider is 'Acs'.");
+    });
+    builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+}
+
+builder.Services.AddSingleton<EmailTemplateService>();
+builder.Services.AddScoped<StoreEmailService>();
+builder.Services.AddHostedService<AbandonedCartReminderWorker>();
+
+// Gift cards and gifting: gift-card issuance/redemption. Email delivery reuses the shared
+// IEmailSender registered above (gift/gift-card flows call SendEmailAsync on it).
 builder.Services.AddScoped<IGiftCardService, GiftCardService>();
 
 var app = builder.Build();

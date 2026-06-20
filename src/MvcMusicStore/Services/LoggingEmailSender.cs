@@ -1,42 +1,61 @@
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+using System.Text;
+using Microsoft.Extensions.Options;
 
-namespace MvcMusicStore.Services
+namespace MvcMusicStore.Services;
+
+/// <summary>
+/// Development/no-credential sender. Logs every message and, when <see cref="EmailOptions.LogDirectory"/>
+/// is configured, persists the rendered HTML so emails can be inspected locally.
+/// </summary>
+public sealed class LoggingEmailSender : IEmailSender
 {
-    // Simulated email delivery for the sample. Real SMTP is intentionally out of scope:
-    // messages are written to the application log so gift-card codes and redeem links are
-    // observable, and the calling pages also surface the code/link directly to the user.
-    public class LoggingEmailSender : IEmailSender
+    private readonly EmailOptions options;
+    private readonly ILogger<LoggingEmailSender> logger;
+
+    public LoggingEmailSender(IOptions<EmailOptions> options, ILogger<LoggingEmailSender> logger)
     {
-        private readonly ILogger<LoggingEmailSender> _logger;
+        this.options = options.Value;
+        this.logger = logger;
+    }
 
-        public LoggingEmailSender(ILogger<LoggingEmailSender> logger)
+    public async Task SendAsync(OutgoingEmail message, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation(
+            "[Email:Log] From=\"{From}\" To={To} <{ToName}> Subject=\"{Subject}\"",
+            options.FromAddress,
+            message.ToAddress,
+            message.ToName,
+            message.Subject);
+
+        if (string.IsNullOrWhiteSpace(options.LogDirectory))
         {
-            _logger = logger;
+            logger.LogDebug("[Email:Log] Plain text body:\n{Body}", message.PlainTextBody);
+            return;
         }
 
-        public Task SendEmailAsync(string toEmail, string subject, string htmlMessage)
+        try
         {
-            var plainText = StripHtml(htmlMessage);
-            _logger.LogInformation(
-                "Simulated email -> To: {ToEmail} | Subject: {Subject}\n{Body}",
-                toEmail,
-                subject,
-                plainText);
+            Directory.CreateDirectory(options.LogDirectory);
+            var fileName = $"{DateTime.UtcNow:yyyyMMdd-HHmmssfff}-{Sanitize(message.Subject)}.html";
+            var path = Path.Combine(options.LogDirectory, fileName);
+            await File.WriteAllTextAsync(path, message.HtmlBody, cancellationToken);
+            logger.LogInformation("[Email:Log] Wrote rendered email to {Path}", path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "[Email:Log] Failed to persist email to '{Directory}'.", options.LogDirectory);
+        }
+    }
 
-            return Task.CompletedTask;
+    private static string Sanitize(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            builder.Append(char.IsLetterOrDigit(ch) ? ch : '-');
         }
 
-        private static string StripHtml(string html)
-        {
-            if (string.IsNullOrWhiteSpace(html))
-            {
-                return string.Empty;
-            }
-
-            var withoutTags = Regex.Replace(html, "<.*?>", " ");
-            return Regex.Replace(withoutTags, "\\s+", " ").Trim();
-        }
+        var slug = builder.ToString().Trim('-');
+        return slug.Length == 0 ? "email" : slug[..Math.Min(slug.Length, 60)];
     }
 }

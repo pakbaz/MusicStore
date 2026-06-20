@@ -2,6 +2,13 @@
 
 @{
     ViewBag.Title = "Checkout Complete";
+    int pointsEarned = (int)(ViewBag.PointsEarned ?? 0);
+    int pointsRedeemed = (int)(ViewBag.PointsRedeemed ?? 0);
+    int referralBonus = (int)(ViewBag.ReferralBonus ?? 0);
+    int newBalance = (int)(ViewBag.NewBalance ?? 0);
+    decimal loyaltyDiscount = (decimal)(ViewBag.LoyaltyDiscount ?? 0m);
+    decimal orderTotal = (decimal)(ViewBag.OrderTotal ?? 0m);
+    string tierName = ViewBag.TierName as string ?? "Bronze";
 }
 
 <h2>Checkout Complete</h2>
@@ -60,6 +67,33 @@
 }
 
 <p>Your order has been placed and your cart has been cleared.</p>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>Payment summary</strong></div>
+    <div class="panel-body">
+        <p>Order total: <strong>@orderTotal.ToString("C")</strong></p>
+        @if (pointsRedeemed > 0)
+        {
+            <p>You redeemed <strong>@pointsRedeemed points</strong> for <strong>@loyaltyDiscount.ToString("C")</strong> off.</p>
+        }
+    </div>
+</div>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>Rewards earned</strong></div>
+    <div class="panel-body">
+        <p>
+            <span class="glyphicon glyphicon-star" aria-hidden="true"></span>
+            You earned <strong>@pointsEarned points</strong> on this order (@tierName tier).
+        </p>
+        @if (referralBonus > 0)
+        {
+            <p class="text-success">Plus a <strong>@referralBonus point</strong> referral bonus for your first purchase!</p>
+        }
+        <p>Your new balance is <strong>@newBalance points</strong>.</p>
+        <a href="@Url.Action("Rewards", "Account")">View your rewards &raquo;</a>
+    </div>
+</div>
 
 <p>
     <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>
