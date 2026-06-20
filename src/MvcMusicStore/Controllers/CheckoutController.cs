@@ -15,16 +15,21 @@ namespace MvcMusicStore.Controllers
         private readonly MusicStoreEntities storeDB;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILoyaltyService _loyalty;
-        const string PromoCode = "FREE";
+        private readonly IOrderEmailSender emailSender;
+        private readonly ILogger<CheckoutController> logger;
 
         public CheckoutController(
             MusicStoreEntities storeDb,
             UserManager<ApplicationUser> userManager,
-            ILoyaltyService loyalty)
+            ILoyaltyService loyalty,
+            IOrderEmailSender emailSender,
+            ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             _userManager = userManager;
             _loyalty = loyalty;
+            this.emailSender = emailSender;
+            this.logger = logger;
         }
 
         //
@@ -55,17 +60,12 @@ namespace MvcMusicStore.Controllers
             var user = await _userManager.GetUserAsync(User);
             await PopulateLoyaltyViewBagAsync(user, await cart.GetTotalAsync());
 
+            // Promo codes are optional and informational only for now; preserve any entered
+            // value when redisplaying the form. Real validation/discounts are tracked separately.
+            ViewBag.PromoCode = Request.Form["PromoCode"].ToString();
+
             if (!ModelState.IsValid)
                 return View(order);
-
-            // Check promo code from form
-            var promoCode = Request.Form["PromoCode"].ToString();
-            if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
-            {
-                ViewBag.PromoCode = promoCode;
-                ModelState.AddModelError("PromoCode", "Please enter the valid promo code to place your order.");
-                return View(order);
-            }
 
             if (await cart.GetCountAsync() == 0)
             {
@@ -76,6 +76,7 @@ namespace MvcMusicStore.Controllers
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
+            order.Status = "Paid";
 
             // Process the order (builds embedded order details, sets Total, and empties the cart)
             await cart.CreateOrderAsync(order);
@@ -109,6 +110,16 @@ namespace MvcMusicStore.Controllers
                 TempData["ReferralBonus"] = loyaltyResult.ReferralBonusPoints;
             }
 
+            // Send the confirmation receipt. A delivery failure must never fail a placed order.
+            try
+            {
+                await emailSender.SendOrderConfirmationAsync(order);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
+            }
+
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
 
@@ -117,13 +128,14 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Complete(int id)
         {
-            // Validate the customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS
-            // subquery), so materialize a single matching record with Take(1) instead.
-            var order = (await storeDB.Orders
+            // Validate customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS subquery),
+            // so materialize a single matching order with Take(1) instead. Owned OrderDetails are
+            // part of the same document, so they load with the order for the confirmation summary.
+            var matchingOrders = await storeDB.Orders
                 .Where(o => o.OrderId == id && o.Username == User.Identity!.Name)
                 .Take(1)
-                .ToListAsync())
-                .FirstOrDefault();
+                .ToListAsync();
+            var order = matchingOrders.FirstOrDefault();
 
             if (order == null)
             {
@@ -142,7 +154,7 @@ namespace MvcMusicStore.Controllers
             ViewBag.TierName = tier.Name;
             ViewBag.ReferralBonus = Convert.ToInt32(TempData["ReferralBonus"] ?? 0);
 
-            return View(id);
+            return View(order);
         }
 
         private int ParseRequestedPoints()

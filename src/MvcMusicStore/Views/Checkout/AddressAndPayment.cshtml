@@ -91,13 +91,13 @@
     </fieldset>
 
     <fieldset class="form-horizontal">
-        <legend>Payment</legend>
-        <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>.</p>
+        <legend>Promo Code</legend>
+        <p>Have a promo code? Enter it below. Promo codes are optional.</p>
 
         <div class="form-group">
             @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
             <div class="col-md-6">
-                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code", autocomplete = "off" })
+                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code (optional)", autocomplete = "off" })
                 @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
             </div>
         </div>
@@ -117,6 +117,7 @@
             int perDollar = (int)ViewBag.PointsPerDollarRedeemed;
             int increment = (int)ViewBag.RedemptionIncrement;
             int maxDiscountDollars = perDollar > 0 ? maxRedeem / perDollar : 0;
+            string maxDiscountDisplay = maxDiscountDollars.ToString("C0");
         }
 
         @if (maxRedeem > 0)
@@ -135,7 +136,7 @@
                            autocomplete="off" />
                     <span class="help-block">
                         Redeem up to <strong>@maxRedeem points</strong> for
-                        <strong>@maxDiscountDollars.ToString("C0")</strong> off this order
+                        <strong>@maxDiscountDisplay</strong> off this order
                         (@perDollar points = $1, in increments of @increment).
                     </span>
                 </div>
