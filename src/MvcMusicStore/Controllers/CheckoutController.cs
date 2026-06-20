@@ -12,15 +12,19 @@ namespace MvcMusicStore.Controllers
     public class CheckoutController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IGiftCardService giftCards;
         private readonly IOrderEmailSender emailSender;
         private readonly ILogger<CheckoutController> logger;
+        const string PromoCode = "FREE";
 
         public CheckoutController(
             MusicStoreEntities storeDb,
+            IGiftCardService giftCardService,
             IOrderEmailSender emailSender,
             ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
+            giftCards = giftCardService;
             this.emailSender = emailSender;
             this.logger = logger;
         }
@@ -46,9 +50,10 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         public async Task<IActionResult> AddressAndPayment(Order order)
         {
-            // Promo codes are optional and informational only for now; preserve any entered
-            // value when redisplaying the form. Real validation/discounts are tracked separately.
-            ViewBag.PromoCode = Request.Form["PromoCode"].ToString();
+            var promoCode = Request.Form["PromoCode"].ToString();
+            var giftCardCode = Request.Form["GiftCardCode"].ToString();
+            ViewBag.PromoCode = promoCode;
+            ViewBag.GiftCardCode = giftCardCode;
 
             if (!ModelState.IsValid)
                 return View(order);
@@ -60,18 +65,57 @@ namespace MvcMusicStore.Controllers
                 return RedirectToAction("Index", "ShoppingCart");
             }
 
+            var cartTotal = await cart.GetTotalAsync();
+
+            // Resolve an optional gift card. The gift card is a payment method that pays the order
+            // total down; the FREE promo is a discount that clears any remainder.
+            GiftCard? giftCard = null;
+            decimal giftApplied = 0m;
+            if (!string.IsNullOrWhiteSpace(giftCardCode))
+            {
+                giftCard = await giftCards.GetActiveByCodeAsync(giftCardCode);
+                if (giftCard == null || giftCard.Balance <= 0)
+                {
+                    ModelState.AddModelError("GiftCardCode", "That gift card code is not valid or has no remaining balance.");
+                    return View(order);
+                }
+
+                giftApplied = Math.Min(giftCard.Balance, cartTotal);
+            }
+
+            var remainingDue = cartTotal - giftApplied;
+            var promoValid = string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase);
+
+            // An order can be placed only when the remainder after the gift card is fully covered,
+            // either by the gift card itself or by the FREE promo discount.
+            if (remainingDue > 0 && !promoValid)
+            {
+                ModelState.AddModelError("PromoCode", "Enter promo code FREE or a gift card that covers your order total to place your order.");
+                return View(order);
+            }
+
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
             order.Status = "Paid";
 
-            // Process the order (builds embedded order details and empties the cart)
+            // Process the order (builds embedded order details, sets Total, and empties the cart)
             await cart.CreateOrderAsync(order);
+
+            // Apply the gift card, recording a redemption transaction on the tracked card.
+            if (giftCard != null && giftApplied > 0)
+            {
+                var applied = giftCards.Redeem(giftCard, order.Total, order.OrderId, order.Username);
+                order.GiftCardCode = giftCard.Code;
+                order.GiftCardAmountApplied = applied;
+            }
+
+            order.AmountDue = promoValid ? 0m : Math.Max(0m, order.Total - order.GiftCardAmountApplied);
 
             // Add the order
             storeDB.Orders.Add(order);
 
-            // Save all changes
+            // Save all changes (new order + any gift-card balance update)
             await storeDB.SaveChangesAsync();
 
             // Send the confirmation receipt. A delivery failure must never fail a placed order.

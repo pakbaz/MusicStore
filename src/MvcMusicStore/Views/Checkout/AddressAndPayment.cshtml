@@ -91,8 +91,17 @@
     </fieldset>
 
     <fieldset class="form-horizontal">
-        <legend>Promo Code</legend>
-        <p>Have a promo code? Enter it below. Promo codes are optional.</p>
+        <legend>Payment</legend>
+        <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>. You can also pay with a gift card.</p>
+
+        <div class="form-group">
+            @Html.Label("GiftCardCode", "Gift Card Code", new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBox("GiftCardCode", ViewBag.GiftCardCode as string, new { @class = "form-control", placeholder = "GIFT-XXXX-XXXX-XXXX (optional)", autocomplete = "off" })
+                @Html.ValidationMessage("GiftCardCode", string.Empty, new { @class = "text-danger" })
+                <p class="help-block">A gift card pays down your order total. Any remainder needs promo code <strong>FREE</strong>.</p>
+            </div>
+        </div>
 
         <div class="form-group">
             @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
