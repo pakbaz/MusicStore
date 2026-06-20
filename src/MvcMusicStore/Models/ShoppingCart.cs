@@ -140,11 +140,26 @@ namespace MvcMusicStore.Models
             var cartItems = await GetCartItemsAsync();
             order.OrderDetails ??= new List<OrderDetail>();
 
+            // Load the catalog albums backing the cart so each line can capture the album's
+            // current title, art, and audio (download) URL as a stable snapshot. Albums are
+            // fetched one id at a time, matching the Cosmos-safe query patterns used elsewhere.
+            var albumLookup = new Dictionary<int, Album>();
+            foreach (var albumId in cartItems.Select(i => i.AlbumId).Distinct())
+            {
+                var album = await _db.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
+                if (album != null)
+                {
+                    albumLookup[albumId] = album;
+                }
+            }
+
             var orderDetailId = 1;
 
             // Iterate over the items in the cart, adding the order details for each
             foreach (var item in cartItems)
             {
+                albumLookup.TryGetValue(item.AlbumId, out var album);
+
                 var orderDetail = new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
@@ -152,6 +167,9 @@ namespace MvcMusicStore.Models
                     OrderId = order.OrderId,
                     UnitPrice = item.AlbumPrice,
                     Quantity = item.Count,
+                    AlbumTitle = album?.Title ?? item.AlbumTitle,
+                    AlbumArtUrl = album?.GetDisplayThumbnailUrl() ?? item.AlbumArtUrl,
+                    AudioUrl = album?.AudioUrl,
                 };
 
                 // Set the order total of the shopping cart
@@ -160,8 +178,9 @@ namespace MvcMusicStore.Models
                 order.OrderDetails.Add(orderDetail);
 
                 // Maintain the denormalized popularity counter so the catalog can sort by
-                // popularity without scanning the Orders container on every request.
-                var album = await _db.Albums.SingleOrDefaultAsync(a => a.AlbumId == item.AlbumId);
+                // popularity without scanning the Orders container on every request. Reuse the
+                // album already loaded for this line (a tracked entity) so the increment is
+                // persisted by the caller's SaveChangesAsync without an extra query.
                 if (album != null)
                 {
                     album.Popularity += item.Count;

@@ -15,12 +15,31 @@
             by @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
         </p>
         <p class="detail-price">@Model.Album.Price.ToString("C")</p>
+        @if (Model.Album.HasPreview)
+        {
+            <div class="album-detail-preview">
+                <h2 class="sr-only">Audio preview</h2>
+                @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                {
+                    PreviewUrl = Model.Album.PreviewUrl!,
+                    DurationSeconds = Model.Album.PreviewDurationSeconds,
+                    Title = Model.Album.Title ?? string.Empty,
+                    Variant = "detail"
+                })
+            </div>
+        }
         <div class="detail-actions">
             <a class="btn btn-primary btn-lg"
                href="@Url.Action("AddToCart", "ShoppingCart", new { id = Model.Album.AlbumId })"
                aria-label="Add @Model.Album.Title to cart">
                 <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
                 Add to cart
+            </a>
+            <a class="btn btn-default btn-lg"
+               href="@Url.Action("Send", "Gift", new { id = Model.Album.AlbumId })"
+               aria-label="Send @Model.Album.Title as a gift">
+                <span class="glyphicon glyphicon-gift" aria-hidden="true"></span>
+                Send as a gift
             </a>
             <a class="btn btn-default btn-lg" href="@Url.Action("Browse", "Store", new { genre = Model.Album.Genre.Name })">
                 Back to @Model.Album.Genre.Name

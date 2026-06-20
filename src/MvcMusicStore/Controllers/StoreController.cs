@@ -100,6 +100,8 @@ namespace MvcMusicStore.Controllers
                     album.ReleaseDate,
                     album.IsAvailable,
                     album.Popularity,
+                    album.PreviewUrl,
+                    album.PreviewDurationSeconds,
                     album.UploadedThumbnailUrl,
                     album.MetadataThumbnailUrl,
                     album.AlbumArtUrl
@@ -116,6 +118,8 @@ namespace MvcMusicStore.Controllers
                 ReleaseDate = album.ReleaseDate,
                 IsAvailable = album.IsAvailable,
                 Popularity = album.Popularity,
+                PreviewUrl = album.PreviewUrl,
+                PreviewDurationSeconds = album.PreviewDurationSeconds,
                 AlbumArtUrl = new Album
                 {
                     UploadedThumbnailUrl = album.UploadedThumbnailUrl,
