@@ -893,6 +893,26 @@ select.form-control option {
     color: var(--text);
 }
 
+/* Keep disabled / readonly controls readable in dark mode. Bootstrap forces a
+   light (#eeeeee) background on these via a higher-specificity selector, which
+   leaves light theme text unreadable (e.g. the AI Music form while generating). */
+.form-control[disabled],
+.form-control[readonly],
+fieldset[disabled] .form-control {
+    background: var(--bg-2);
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+    opacity: 0.9;
+}
+
+.form-control[disabled]::placeholder,
+.form-control[readonly]::placeholder {
+    color: var(--text-faint);
+    -webkit-text-fill-color: var(--text-faint);
+}
+
 /* --------------------------------------------------------------------------
    Tables (admin / cart)
    -------------------------------------------------------------------------- */
@@ -920,15 +940,31 @@ select.form-control option {
     vertical-align: middle;
 }
 
-.table-striped > tbody > tr:nth-of-type(odd) {
+/* Bootstrap stripes/hover/borders target the cells (> td, > th) with light
+   colours at a higher specificity than a row-level override, so match it at the
+   cell level to keep rows readable in dark mode (e.g. the shopping cart). */
+.table-striped > tbody > tr:nth-of-type(odd) > td,
+.table-striped > tbody > tr:nth-of-type(odd) > th {
     background-color: rgba(255, 255, 255, 0.03);
 }
 
-.table-hover > tbody > tr:hover {
+.table-hover > tbody > tr:hover > td,
+.table-hover > tbody > tr:hover > th {
     background-color: var(--accent-soft);
 }
 
-[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) {
+.table-bordered,
+.table-bordered > thead > tr > th,
+.table-bordered > thead > tr > td,
+.table-bordered > tbody > tr > th,
+.table-bordered > tbody > tr > td,
+.table-bordered > tfoot > tr > th,
+.table-bordered > tfoot > tr > td {
+    border-color: var(--border);
+}
+
+[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > th {
     background-color: rgba(17, 16, 24, 0.03);
 }
 
