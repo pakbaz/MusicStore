@@ -63,6 +63,9 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
+        [ScaffoldColumn(false)]
+        public string Status { get; set; } = "Paid";
+
         public List<OrderDetail>? OrderDetails { get; set; }
     }
 }
