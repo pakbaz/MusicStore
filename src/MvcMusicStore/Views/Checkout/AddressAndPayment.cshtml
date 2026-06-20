@@ -91,8 +91,17 @@
     </fieldset>
 
     <fieldset class="form-horizontal">
-        <legend>Promo Code</legend>
-        <p>Have a promo code? Enter it below. Promo codes are optional.</p>
+        <legend>Payment</legend>
+        <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>. You can also pay with a gift card.</p>
+
+        <div class="form-group">
+            @Html.Label("GiftCardCode", "Gift Card Code", new { @class = "control-label col-md-2" })
+            <div class="col-md-6">
+                @Html.TextBox("GiftCardCode", ViewBag.GiftCardCode as string, new { @class = "form-control", placeholder = "GIFT-XXXX-XXXX-XXXX (optional)", autocomplete = "off" })
+                @Html.ValidationMessage("GiftCardCode", string.Empty, new { @class = "text-danger" })
+                <p class="help-block">A gift card pays down your order total. Any remainder needs promo code <strong>FREE</strong>.</p>
+            </div>
+        </div>
 
         <div class="form-group">
             @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
@@ -101,6 +110,51 @@
                 @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
             </div>
         </div>
+    </fieldset>
+
+    <fieldset class="form-horizontal">
+        <legend>Loyalty Rewards</legend>
+
+        <p>
+            You have <strong>@ViewBag.LoyaltyPoints points</strong>
+            (@ViewBag.LoyaltyTierName tier &middot; @ViewBag.LoyaltyMultiplier&times; earn).
+            This order earns about <strong>@ViewBag.ProjectedEarn points</strong>.
+        </p>
+
+        @{
+            int maxRedeem = (int)ViewBag.MaxRedeemablePoints;
+            int perDollar = (int)ViewBag.PointsPerDollarRedeemed;
+            int increment = (int)ViewBag.RedemptionIncrement;
+            int maxDiscountDollars = perDollar > 0 ? maxRedeem / perDollar : 0;
+            string maxDiscountDisplay = maxDiscountDollars.ToString("C0");
+        }
+
+        @if (maxRedeem > 0)
+        {
+            <div class="form-group">
+                @Html.Label("PointsToRedeem", "Redeem points", new { @class = "control-label col-md-2" })
+                <div class="col-md-6">
+                    <input type="number"
+                           name="PointsToRedeem"
+                           id="PointsToRedeem"
+                           class="form-control"
+                           min="0"
+                           step="@increment"
+                           max="@maxRedeem"
+                           value="0"
+                           autocomplete="off" />
+                    <span class="help-block">
+                        Redeem up to <strong>@maxRedeem points</strong> for
+                        <strong>@maxDiscountDisplay</strong> off this order
+                        (@perDollar points = $1, in increments of @increment).
+                    </span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="help-block">Earn more points to unlock a discount on a future order.</p>
+        }
     </fieldset>
 
     <p>

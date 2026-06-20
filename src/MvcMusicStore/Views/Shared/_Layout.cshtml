@@ -19,7 +19,7 @@
             document.documentElement.setAttribute("data-theme", theme);
         }());
     </script>
-    <title>@ViewBag.Title - MVC Music Store</title>
+    @await Html.PartialAsync("_SeoMeta")
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -55,6 +55,7 @@
                         <li>@Html.ActionLink("Browse", "Index", "Store")</li>
                         <li>@Html.ActionLink("Deals", "Index", "Bundles")</li>
                         <li>@Html.ActionLink("AI Music", "Index", "AiMusic")</li>
+                        <li>@Html.ActionLink("Gift Cards", "Buy", "GiftCard")</li>
                         @await Component.InvokeAsync("GenreMenu")
                     </ul>
                     <ul class="nav navbar-nav navbar-right site-utility-nav">
@@ -68,6 +69,7 @@
                             </button>
                         </li>
                         @await Component.InvokeAsync("CartSummary")
+                        @await Component.InvokeAsync("LoyaltySummary")
                         @await Html.PartialAsync("_LoginPartial")
                     </ul>
                 </div>
@@ -140,6 +142,7 @@
             }, true);
         }());
     </script>
+    <script src="~/js/audio-preview.js"></script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

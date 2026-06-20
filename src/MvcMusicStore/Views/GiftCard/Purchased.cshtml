@@ -1,0 +1,41 @@
+@model MvcMusicStore.Models.GiftCard
+@{
+    ViewBag.Title = "Gift Card Sent";
+}
+
+<h2>Gift Card Sent</h2>
+
+<div class="alert alert-success">
+    Your <strong>@Model.InitialAmount.ToString("C")</strong> gift card is on its way to
+    <strong>@Model.RecipientEmail</strong>.
+</div>
+
+<div class="panel panel-default gift-card-receipt">
+    <div class="panel-body">
+        <p class="gift-card-code-label">Gift card code</p>
+        <p class="gift-card-code">@Model.Code</p>
+        <dl class="dl-horizontal">
+            <dt>Amount</dt>
+            <dd>@Model.InitialAmount.ToString("C")</dd>
+            <dt>Recipient</dt>
+            <dd>@(string.IsNullOrWhiteSpace(Model.RecipientName) ? Model.RecipientEmail : $"{Model.RecipientName} ({Model.RecipientEmail})")</dd>
+            @if (!string.IsNullOrWhiteSpace(Model.Message))
+            {
+                <dt>Message</dt>
+                <dd>@Model.Message</dd>
+            }
+        </dl>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <span class="glyphicon glyphicon-envelope" aria-hidden="true"></span>
+    A confirmation email with the code above has been sent to the recipient.
+    (This sample logs emails instead of sending them, so the code is shown here for your reference.)
+</div>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Index", "GiftCard")">View my gift cards</a>
+    <a class="btn btn-default" href="@Url.Action("Buy", "GiftCard")">Send another</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Store")">Browse music</a>
+</p>

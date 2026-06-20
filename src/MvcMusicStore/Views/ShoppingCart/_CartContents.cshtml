@@ -60,7 +60,7 @@ else
                         }
                         else
                         {
-                            @Html.ActionLink(item.DisplayTitle, "Details", "Store", new { id = item.AlbumId }, null)
+                            <a href="@Url.AlbumUrl(item.AlbumId, item.DisplayTitle)">@item.DisplayTitle</a>
                         }
                     </td>
                     <td class="text-right">@item.LineUnitPrice.ToString("C")</td>

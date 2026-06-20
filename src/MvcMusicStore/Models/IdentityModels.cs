@@ -7,6 +7,16 @@ namespace MvcMusicStore.Models
     // You can add profile data for the user by adding more properties to your ApplicationUser class.
     public class ApplicationUser : Microsoft.AspNetCore.Identity.IdentityUser
     {
+        // Loyalty rewards state.
+        public int LoyaltyPoints { get; set; }
+        public decimal LifetimeSpend { get; set; }
+        public int LifetimePointsEarned { get; set; }
+        public bool HasMadePurchase { get; set; }
+
+        // Referral program state.
+        public string? ReferralCode { get; set; }
+        public string? ReferredByCode { get; set; }
+        public bool ReferralRewardGranted { get; set; }
     }
 
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
