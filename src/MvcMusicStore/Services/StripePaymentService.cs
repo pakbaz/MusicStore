@@ -32,26 +32,59 @@ public class StripePaymentService : IPaymentService
         IReadOnlyList<Cart> items,
         string successUrl,
         string cancelUrl,
+        decimal giftCardAmount = 0m,
         CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
         var currency = string.IsNullOrWhiteSpace(_options.Currency) ? "usd" : _options.Currency.ToLowerInvariant();
 
-        var lineItems = items.Select(item => new SessionLineItemOptions
+        List<SessionLineItemOptions> lineItems;
+        if (giftCardAmount > 0m)
         {
-            Quantity = item.Count,
-            PriceData = new SessionLineItemPriceDataOptions
+            // A gift card covers part of the order, so itemizing would overcharge. Charge the
+            // single remaining balance (order total minus the gift card) as one line item.
+            var itemsTotal = items.Sum(item => item.AlbumPrice * item.Count);
+            var remainder = itemsTotal - giftCardAmount;
+            if (remainder < 0m)
             {
-                Currency = currency,
-                // Stripe expects the amount in the smallest currency unit (e.g. cents).
-                UnitAmountDecimal = item.AlbumPrice * 100m,
-                ProductData = new SessionLineItemPriceDataProductDataOptions
+                remainder = 0m;
+            }
+
+            lineItems = new List<SessionLineItemOptions>
+            {
+                new()
                 {
-                    Name = string.IsNullOrWhiteSpace(item.AlbumTitle) ? $"Album #{item.AlbumId}" : item.AlbumTitle,
+                    Quantity = 1,
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = currency,
+                        UnitAmountDecimal = remainder * 100m,
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = $"Order #{order.OrderId} balance (after gift card)",
+                        },
+                    },
                 },
-            },
-        }).ToList();
+            };
+        }
+        else
+        {
+            lineItems = items.Select(item => new SessionLineItemOptions
+            {
+                Quantity = item.Count,
+                PriceData = new SessionLineItemPriceDataOptions
+                {
+                    Currency = currency,
+                    // Stripe expects the amount in the smallest currency unit (e.g. cents).
+                    UnitAmountDecimal = item.AlbumPrice * 100m,
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = string.IsNullOrWhiteSpace(item.AlbumTitle) ? $"Album #{item.AlbumId}" : item.AlbumTitle,
+                    },
+                },
+            }).ToList();
+        }
 
         var createOptions = new SessionCreateOptions
         {

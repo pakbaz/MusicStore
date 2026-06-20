@@ -21,6 +21,7 @@ public interface IPaymentService
         IReadOnlyList<Cart> items,
         string successUrl,
         string cancelUrl,
+        decimal giftCardAmount = 0m,
         CancellationToken cancellationToken = default);
 
     /// <summary>

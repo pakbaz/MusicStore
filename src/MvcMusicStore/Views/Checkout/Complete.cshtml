@@ -1,4 +1,4 @@
-﻿@model MvcMusicStore.Models.Order
+@model MvcMusicStore.Models.Order
 @using MvcMusicStore.Models
 
 @{
@@ -77,6 +77,22 @@
         </tr>
     </tfoot>
 </table>
+
+@if (Model.GiftCardAmountApplied > 0)
+{
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <dl class="dl-horizontal">
+                <dt>Order total</dt>
+                <dd>@Model.Total.ToString("C")</dd>
+                <dt>Gift card applied</dt>
+                <dd>-@Model.GiftCardAmountApplied.ToString("C") (@Model.GiftCardCode)</dd>
+                <dt>Amount due</dt>
+                <dd>@Model.AmountDue.ToString("C")</dd>
+            </dl>
+        </div>
+    </div>
+}
 
 <p>
     <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>

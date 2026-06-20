@@ -1,0 +1,68 @@
+@model MvcMusicStore.ViewModels.RedeemGiftViewModel
+@{
+    ViewBag.Title = "Redeem Your Gift";
+    var redeemPath = Url.Action("Redeem", "Gift", new { token = Model.Token });
+    var loginUrl = Url.Action("Login", "Account", new { returnUrl = redeemPath });
+}
+
+<h2>Redeem Your Gift</h2>
+
+@if (TempData["GiftMessage"] != null)
+{
+    <div class="alert alert-info" role="status">@TempData["GiftMessage"]</div>
+}
+
+@if (Model.Gift == null)
+{
+    <div class="alert alert-warning" role="alert">
+        This gift link isn't valid. Please double-check the link in your email.
+    </div>
+    <p><a class="btn btn-default" href="@Url.Action("Index", "Store")">Browse music</a></p>
+}
+else
+{
+    <div class="gift-album-summary">
+        <img class="gift-album-art"
+             alt="@Model.Gift.AlbumTitle"
+             src="@Url.Content(Model.Gift.AlbumArtUrl ?? MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)"
+             data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+        <div>
+            <p class="detail-kicker">A gift from @(string.IsNullOrWhiteSpace(Model.Gift.SenderName) ? "a friend" : Model.Gift.SenderName)</p>
+            <h3>@Model.Gift.AlbumTitle</h3>
+            @if (!string.IsNullOrWhiteSpace(Model.Gift.Message))
+            {
+                <blockquote class="gift-message">@Model.Gift.Message</blockquote>
+            }
+        </div>
+    </div>
+
+    if (Model.Gift.IsRedeemed)
+    {
+        <div class="alert alert-info" role="status">
+            This gift has already been redeemed@(Model.Gift.RedeemedDate.HasValue ? $" on {Model.Gift.RedeemedDate.Value:g}" : "").
+        </div>
+        <p><a class="btn btn-default" href="@Url.Action("Index", "Store")">Browse music</a></p>
+    }
+    else if (Model.IsSignedIn)
+    {
+        using (Html.BeginForm("Redeem", "Gift", FormMethod.Post))
+        {
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="token" value="@Model.Token" />
+            <p>Redeem this gift to add <strong>@Model.Gift.AlbumTitle</strong> to your account at no charge.</p>
+            <p>
+                <button type="submit" name="confirm" value="yes" class="btn btn-primary btn-lg">Redeem gift</button>
+            </p>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info">
+            Please sign in or create an account to redeem your gift.
+        </div>
+        <p>
+            <a class="btn btn-primary" href="@loginUrl">Sign in to redeem</a>
+            <a class="btn btn-default" href="@Url.Action("Register", "Account", new { returnUrl = redeemPath })">Create an account</a>
+        </p>
+    }
+}

@@ -70,6 +70,10 @@ var cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"];
 var cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? "musicstore";
 var cosmosUseEmulatorWorkarounds = builder.Configuration.GetValue("Cosmos:UseEmulatorWorkarounds", false);
 
+// Catalog id counters live in a dedicated Cosmos container; the context needs the database name
+// (not exposed by the EF provider) to reach it via the shared CosmosClient.
+builder.Services.AddSingleton(new CosmosCatalogOptions(cosmosDatabase));
+
 builder.Services.AddDbContext<MusicStoreEntities>(options =>
     ConfigureCosmos(options, cosmosConnectionString, cosmosEndpoint, cosmosDatabase, cosmosUseEmulatorWorkarounds, azureCredential));
 
@@ -129,6 +133,10 @@ builder.Services.AddScoped<IOrderEmailSender, LoggingOrderEmailSender>();
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
+// Gift cards and gifting: simulated email delivery + gift-card issuance/redemption.
+builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+builder.Services.AddScoped<IGiftCardService, GiftCardService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -147,6 +155,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseSession();
+
+// Clean, human-readable URLs for albums and artists. These are additive named routes; the
+// legacy {controller}/{action}/{id} URLs keep working. Slug links are generated via the route
+// names so generation is deterministic regardless of the catch-all default route below.
+app.MapControllerRoute(
+    name: "album",
+    pattern: "album/{id:int}/{slug?}",
+    defaults: new { controller = "Store", action = "Details" });
+
+app.MapControllerRoute(
+    name: "artist",
+    pattern: "artist/{id:int}/{slug?}",
+    defaults: new { controller = "Store", action = "Artist" });
 
 app.MapControllerRoute(
     name: "default",
@@ -167,6 +188,13 @@ static async Task SeedDatabaseAsync(WebApplication app)
         // Ensure Cosmos database and containers exist
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
+
+        // The atomic id-counter container is managed via the Cosmos SDK (not an EF entity), so create
+        // it explicitly. Partition key "/id" gives each counter its own logical partition.
+        var catalogOptions = services.GetRequiredService<CosmosCatalogOptions>();
+        await musicStoreDb.Database.GetCosmosClient()
+            .GetDatabase(catalogOptions.DatabaseName)
+            .CreateContainerIfNotExistsAsync(catalogOptions.CountersContainerName, "/id");
 
         var identityDb = services.GetRequiredService<ApplicationDbContext>();
         await identityDb.Database.EnsureCreatedAsync();
@@ -198,11 +226,58 @@ static async Task SeedDatabaseAsync(WebApplication app)
 
         // Seed music store data
         await SampleData.SeedAsync(musicStoreDb);
+
+        // Initialize id counters from the current max once, at startup, so id allocation never
+        // scans the catalog containers on the insert path.
+        await musicStoreDb.EnsureSequencesInitializedAsync();
+
+        // Materialize the denormalized Album.Popularity counter from existing orders so popularity
+        // sorting works for catalogs created before the counter existed. Startup-only, never per request.
+        await BackfillAlbumPopularityAsync(musicStoreDb);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
+static async Task BackfillAlbumPopularityAsync(MusicStoreEntities db)
+{
+    // Skip cheaply when there are no orders to aggregate (Cosmos can't translate AnyAsync/EXISTS,
+    // so materialize a single id instead).
+    var hasOrders = (await db.Orders.Select(o => o.OrderId).Take(1).ToListAsync()).Count != 0;
+    if (!hasOrders)
+    {
+        return;
+    }
+
+    var orders = await db.Orders.ToListAsync();
+    var salesByAlbum = orders
+        .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
+        .GroupBy(detail => detail.AlbumId)
+        .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
+
+    if (salesByAlbum.Count == 0)
+    {
+        return;
+    }
+
+    var albums = await db.Albums.ToListAsync();
+    var changed = false;
+    foreach (var album in albums)
+    {
+        var sold = salesByAlbum.TryGetValue(album.AlbumId, out var quantity) ? quantity : 0;
+        if (album.Popularity != sold)
+        {
+            album.Popularity = sold;
+            changed = true;
+        }
+    }
+
+    if (changed)
+    {
+        await db.SaveChangesAsync();
     }
 }
 
