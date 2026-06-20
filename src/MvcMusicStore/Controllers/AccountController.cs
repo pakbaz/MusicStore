@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
+using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
 {
@@ -15,13 +17,16 @@ namespace MvcMusicStore.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly ILoyaltyService _loyalty;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager)
+            SignInManager<ApplicationUser> signInManager,
+            ILoyaltyService loyalty)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _loyalty = loyalty;
         }
 
         private async Task MigrateShoppingCartAsync(string userName)
@@ -71,9 +76,9 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Account/Register
         [AllowAnonymous]
-        public IActionResult Register()
+        public IActionResult Register([FromQuery(Name = "ref")] string? referralCode = null)
         {
-            return View();
+            return View(new RegisterViewModel { ReferralCode = referralCode });
         }
 
         //
@@ -89,6 +94,8 @@ namespace MvcMusicStore.Controllers
                 var result = await _userManager.CreateAsync(user, model.Password!);
                 if (result.Succeeded)
                 {
+                    // Attribute the referral (if any) and ensure the new user has their own code.
+                    await _loyalty.RegisterReferralAsync(user, model.ReferralCode);
                     await _signInManager.SignInAsync(user, isPersistent: false);
                     await MigrateShoppingCartAsync(user.UserName!);
                     return RedirectToAction("Index", "Home");
@@ -194,6 +201,55 @@ namespace MvcMusicStore.Controllers
             }
 
             // If we got this far, something failed, redisplay form
+            return View(model);
+        }
+
+        //
+        // GET: /Account/Rewards
+        public async Task<IActionResult> Rewards()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login");
+            }
+
+            var referralCode = await _loyalty.EnsureReferralCodeAsync(user);
+            var tier = _loyalty.GetTier(user.LifetimeSpend);
+            var nextTier = _loyalty.GetNextTier(user.LifetimeSpend);
+            var options = _loyalty.Options;
+            var pointsPerDollarRedeemed = options.PointsPerDollarRedeemed > 0 ? options.PointsPerDollarRedeemed : 1;
+
+            var model = new RewardsViewModel
+            {
+                Points = user.LoyaltyPoints,
+                LifetimeSpend = user.LifetimeSpend,
+                LifetimePointsEarned = user.LifetimePointsEarned,
+                PointsDollarValue = (decimal)user.LoyaltyPoints / pointsPerDollarRedeemed,
+                TierName = tier.Name,
+                TierMultiplier = tier.EarnMultiplier,
+                ReferralCode = referralCode,
+                ReferralLink = Url.Action("Register", "Account", new { @ref = referralCode }, Request.Scheme) ?? string.Empty,
+                WasReferred = !string.IsNullOrWhiteSpace(user.ReferredByCode),
+                ReferrerRewardPoints = options.ReferrerRewardPoints,
+                RefereeRewardPoints = options.RefereeRewardPoints,
+                PointsPerDollar = options.PointsPerDollar,
+                PointsPerDollarRedeemed = options.PointsPerDollarRedeemed,
+            };
+
+            if (nextTier != null)
+            {
+                model.NextTierName = nextTier.Name;
+                model.NextTierMultiplier = nextTier.EarnMultiplier;
+                model.SpendToNextTier = Math.Max(0m, nextTier.MinimumLifetimeSpend - user.LifetimeSpend);
+
+                var span = nextTier.MinimumLifetimeSpend - tier.MinimumLifetimeSpend;
+                var progressed = user.LifetimeSpend - tier.MinimumLifetimeSpend;
+                model.NextTierProgressPercent = span > 0
+                    ? (int)Math.Clamp(progressed / span * 100m, 0m, 100m)
+                    : 0;
+            }
+
             return View(model);
         }
 
