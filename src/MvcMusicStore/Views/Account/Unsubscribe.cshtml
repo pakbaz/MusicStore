@@ -1,0 +1,32 @@
+﻿@{
+    ViewBag.Title = "Unsubscribe";
+    var success = ViewBag.Success as bool? ?? false;
+    var type = ViewBag.UnsubscribeType as string;
+    var scope = string.Equals(type, "marketing", StringComparison.OrdinalIgnoreCase)
+        ? "newsletter and new-release"
+        : string.Equals(type, "cart", StringComparison.OrdinalIgnoreCase)
+            ? "abandoned-cart reminder"
+            : "marketing";
+}
+
+<h2>@ViewBag.Title</h2>
+
+@if (success)
+{
+    <div class="alert alert-success">
+        You've been unsubscribed from @scope emails. We're sorry to see you go.
+    </div>
+    <p>You can re-enable any email type anytime from your account's email preferences.</p>
+}
+else
+{
+    <div class="alert alert-warning">
+        We couldn't process this unsubscribe link. It may be invalid or expired.
+    </div>
+    <p>If you're signed in, you can update your choices from your email preferences.</p>
+}
+
+<p>
+    <a class="btn btn-default" href="@Url.Action("EmailPreferences", "Account")">Email preferences</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
+</p>

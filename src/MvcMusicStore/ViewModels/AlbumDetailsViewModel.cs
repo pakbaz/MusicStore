@@ -7,5 +7,6 @@ namespace MvcMusicStore.ViewModels
         public required Album Album { get; set; }
         public List<Album> RelatedByGenre { get; set; } = new();
         public List<Album> MoreFromArtist { get; set; } = new();
+        public AlbumReviewsViewModel Reviews { get; set; } = new();
     }
 }

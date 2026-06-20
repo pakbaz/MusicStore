@@ -34,6 +34,7 @@ namespace MvcMusicStore.Models
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<Review>    Reviews { get; set; }
         public DbSet<GiftCard>  GiftCards { get; set; }
         public DbSet<AlbumGift> Gifts { get; set; }
 
@@ -80,6 +81,12 @@ namespace MvcMusicStore.Models
                     d.Ignore(x => x.Album);
                     d.Ignore(x => x.Order);
                 });
+            });
+
+            modelBuilder.Entity<Review>(b =>
+            {
+                b.ToContainer("Reviews");
+                b.HasKey(r => r.ReviewId);
             });
 
             modelBuilder.Entity<GiftCard>(b =>
@@ -171,6 +178,12 @@ namespace MvcMusicStore.Models
         public async Task<int> NextAlbumGiftIdAsync(CancellationToken cancellationToken = default)
         {
             var ids = await Gifts.Select(g => g.AlbumGiftId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextReviewIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await Reviews.Select(r => r.ReviewId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 1 : ids.Max() + 1;
         }
     }

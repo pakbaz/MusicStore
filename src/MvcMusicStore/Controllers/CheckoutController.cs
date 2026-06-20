@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
@@ -15,7 +16,9 @@ namespace MvcMusicStore.Controllers
         private readonly MusicStoreEntities storeDB;
         private readonly IPaymentService paymentService;
         private readonly IGiftCardService giftCards;
-        private readonly IOrderEmailSender emailSender;
+        private readonly ILoyaltyService loyalty;
+        private readonly UserManager<ApplicationUser> userManager;
+        private readonly StoreEmailService storeEmail;
         private readonly ILogger<CheckoutController> logger;
         const string PromoCode = "FREE";
 
@@ -23,13 +26,17 @@ namespace MvcMusicStore.Controllers
             MusicStoreEntities storeDb,
             IPaymentService paymentService,
             IGiftCardService giftCardService,
-            IOrderEmailSender emailSender,
+            ILoyaltyService loyaltyService,
+            UserManager<ApplicationUser> userManager,
+            StoreEmailService storeEmail,
             ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             this.paymentService = paymentService;
             giftCards = giftCardService;
-            this.emailSender = emailSender;
+            loyalty = loyaltyService;
+            this.userManager = userManager;
+            this.storeEmail = storeEmail;
             this.logger = logger;
         }
 
@@ -46,6 +53,9 @@ namespace MvcMusicStore.Controllers
             }
 
             ViewBag.PaymentConfigured = paymentService.IsConfigured;
+            var user = await userManager.GetUserAsync(User);
+            PopulateLoyaltyViewBag(user, await cart.GetTotalAsync());
+
             return View(new Order());
         }
 
@@ -55,38 +65,45 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         public async Task<IActionResult> AddressAndPayment(Order order)
         {
-            ViewBag.PaymentConfigured = paymentService.IsConfigured;
-
             var promoCode = Request.Form["PromoCode"].ToString().Trim();
             var giftCardCode = Request.Form["GiftCardCode"].ToString().Trim();
             ViewBag.PromoCode = promoCode;
             ViewBag.GiftCardCode = giftCardCode;
+            ViewBag.PaymentConfigured = paymentService.IsConfigured;
+
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            var user = await userManager.GetUserAsync(User);
+            var cartTotal = await cart.GetTotalAsync();
+            PopulateLoyaltyViewBag(user, cartTotal);
 
             if (!ModelState.IsValid)
                 return View(order);
 
-            var isFreePromo = string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase);
-
-            // A non-empty promo code that isn't the valid one is rejected so shoppers get feedback.
-            // An empty promo code means "pay with a gift card and/or card" and falls through.
-            if (!string.IsNullOrWhiteSpace(promoCode) && !isFreePromo)
-            {
-                ModelState.AddModelError("PromoCode", "That promo code isn't valid. Leave it blank to pay by card.");
-                return View(order);
-            }
-
-            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
             if (await cart.GetCountAsync() == 0)
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
             }
 
-            var cartTotal = await cart.GetTotalAsync();
+            var isFreePromo = string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase);
 
-            // Resolve an optional gift card. A gift card pays the order total down; the FREE promo
-            // and/or a card payment cover any remainder. FREE makes the whole order free, so a gift
-            // card is ignored in that case to preserve its balance.
+            // A non-empty promo code that isn't the valid one is rejected so shoppers get feedback.
+            // An empty promo code means "pay with loyalty points, a gift card, and/or card".
+            if (!string.IsNullOrWhiteSpace(promoCode) && !isFreePromo)
+            {
+                ModelState.AddModelError("PromoCode", "That promo code isn't valid. Leave it blank to pay by card.");
+                return View(order);
+            }
+
+            // Loyalty redemption is computed first; it discounts the amount owed before any gift
+            // card or card charge. The discount is recorded on the order and the points balance is
+            // only moved once payment is captured.
+            var requestedPoints = ParseRequestedPoints();
+            var redemption = loyalty.ComputeRedemption(requestedPoints, user?.LoyaltyPoints ?? 0, cartTotal);
+            var discountedTotal = cartTotal - redemption.Discount;
+
+            // Resolve an optional gift card against the post-loyalty total. The FREE promo makes the
+            // whole order free, so a gift card is ignored in that case to preserve its balance.
             GiftCard? giftCard = null;
             decimal giftApplied = 0m;
             if (!isFreePromo && !string.IsNullOrWhiteSpace(giftCardCode))
@@ -98,31 +115,37 @@ namespace MvcMusicStore.Controllers
                     return View(order);
                 }
 
-                giftApplied = Math.Min(giftCard.Balance, cartTotal);
+                giftApplied = Math.Min(giftCard.Balance, discountedTotal);
             }
 
-            var remainingDue = cartTotal - giftApplied;
+            var remainingDue = discountedTotal - giftApplied;
 
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
 
-            // Path 1 — no payment provider needed: the FREE promo or a gift card covers the order.
+            var tier = loyalty.GetTier(user?.LifetimeSpend ?? 0m);
+
+            // Path 1 — no card payment needed: FREE, a gift card, or loyalty points cover the total.
             if (isFreePromo || remainingDue <= 0m)
             {
                 await cart.CreateOrderAsync(order);
+                ApplyLoyaltyToOrder(order, redemption, user, tier, cartTotal);
 
                 if (isFreePromo)
                 {
                     order.PaymentProvider = "Promo (FREE)";
                 }
-                else
+                else if (giftCard != null && giftApplied > 0m)
                 {
-                    // Gift card covers the full total — redeem it now and record it on the order.
-                    var applied = giftCards.Redeem(giftCard!, order.Total, order.OrderId, order.Username);
-                    order.GiftCardCode = giftCard!.Code;
+                    var applied = giftCards.Redeem(giftCard, order.Total, order.OrderId, order.Username);
+                    order.GiftCardCode = giftCard.Code;
                     order.GiftCardAmountApplied = applied;
                     order.PaymentProvider = "Gift card";
+                }
+                else
+                {
+                    order.PaymentProvider = order.LoyaltyDiscount > 0m ? "Loyalty points" : "No charge";
                 }
 
                 order.AmountDue = 0m;
@@ -132,7 +155,13 @@ namespace MvcMusicStore.Controllers
                 storeDB.Orders.Add(order);
                 await storeDB.SaveChangesAsync();
 
-                await SendReceiptSafelyAsync(order);
+                if (user != null)
+                {
+                    var loyaltyResult = await loyalty.ApplyPurchaseAsync(user, cartTotal, redemption.PointsApplied);
+                    TempData["ReferralBonus"] = loyaltyResult.ReferralBonusPoints;
+                }
+
+                await storeEmail.SendOrderConfirmationAsync(order);
 
                 return RedirectToAction("Complete", new { id = order.OrderId });
             }
@@ -141,15 +170,18 @@ namespace MvcMusicStore.Controllers
             if (!paymentService.IsConfigured)
             {
                 ModelState.AddModelError(string.Empty,
-                    "Online card payment isn't configured yet. Enter promo code FREE, or use a gift card that covers your total.");
+                    "Online card payment isn't configured yet. Enter promo code FREE, or use loyalty points / a gift card that cover your total.");
                 return View(order);
             }
 
             var items = await cart.GetCartItemsAsync();
 
             // Persist a pending order so the address and line items survive the redirect to Stripe.
-            // The cart is intentionally NOT emptied, and any gift card is NOT redeemed, until capture.
+            // The cart is intentionally NOT emptied, the gift card is NOT redeemed, and loyalty
+            // points are NOT moved until the payment is captured.
             await cart.BuildOrderAsync(order);
+            ApplyLoyaltyToOrder(order, redemption, user, tier, cartTotal);
+
             order.PaymentProvider = "Stripe";
             order.PaymentStatus = PaymentStatus.Pending;
             order.AmountDue = remainingDue;
@@ -170,7 +202,9 @@ namespace MvcMusicStore.Controllers
                     + "session_id={CHECKOUT_SESSION_ID}";
                 var cancelUrl = Url.Action("Cancel", "Checkout", new { id = order.OrderId }, Request.Scheme)!;
 
-                var session = await paymentService.CreateCheckoutSessionAsync(order, items, successUrl, cancelUrl, giftApplied);
+                // Stripe charges the post-loyalty, post-gift-card remainder.
+                var discountAmount = redemption.Discount + giftApplied;
+                var session = await paymentService.CreateCheckoutSessionAsync(order, items, successUrl, cancelUrl, discountAmount);
 
                 order.PaymentReference = session.Id;
                 await storeDB.SaveChangesAsync();
@@ -201,6 +235,8 @@ namespace MvcMusicStore.Controllers
                 return View("Error");
             }
 
+            int referralBonus = 0;
+
             // Verify and finalize a pending Stripe order from the success redirect. This is
             // idempotent with the webhook — whichever arrives first wins.
             if (order.PaymentStatus == PaymentStatus.Pending && !string.IsNullOrWhiteSpace(sessionId))
@@ -223,7 +259,8 @@ namespace MvcMusicStore.Controllers
 
                         await storeDB.SaveChangesAsync();
 
-                        await SendReceiptSafelyAsync(order);
+                        referralBonus = await ApplyRecordedLoyaltyAsync(order);
+                        await storeEmail.SendOrderConfirmationAsync(order);
                     }
                     else if (status.Status is PaymentStatus.Cancelled or PaymentStatus.Failed)
                     {
@@ -236,6 +273,16 @@ namespace MvcMusicStore.Controllers
                     logger.LogError(ex, "Failed to verify Stripe session {SessionId} for order {OrderId}.", sessionId, order.OrderId);
                 }
             }
+
+            var viewer = await userManager.GetUserAsync(User);
+            var viewerTier = loyalty.GetTier(viewer?.LifetimeSpend ?? 0m);
+            ViewBag.PointsEarned = order.LoyaltyPointsEarned;
+            ViewBag.PointsRedeemed = order.LoyaltyPointsRedeemed;
+            ViewBag.LoyaltyDiscount = order.LoyaltyDiscount;
+            ViewBag.OrderTotal = order.Total;
+            ViewBag.NewBalance = viewer?.LoyaltyPoints ?? 0;
+            ViewBag.TierName = viewerTier.Name;
+            ViewBag.ReferralBonus = referralBonus != 0 ? referralBonus : Convert.ToInt32(TempData["ReferralBonus"] ?? 0);
 
             return View(order);
         }
@@ -311,7 +358,8 @@ namespace MvcMusicStore.Controllers
                     if (!string.IsNullOrWhiteSpace(order.Username))
                         await new ShoppingCart(storeDB).EmptyCartForUserAsync(order.Username);
                     await storeDB.SaveChangesAsync();
-                    await SendReceiptSafelyAsync(order);
+                    await ApplyRecordedLoyaltyAsync(order);
+                    await storeEmail.SendOrderConfirmationAsync(order);
                     break;
 
                 case PaymentStatus.Failed when order.PaymentStatus == PaymentStatus.Pending:
@@ -341,6 +389,35 @@ namespace MvcMusicStore.Controllers
             return (await query.Take(1).ToListAsync()).FirstOrDefault();
         }
 
+        // Records the loyalty redemption/discount and earned points on the order. The points
+        // balance itself is only moved by ApplyPurchaseAsync once the order is paid.
+        private void ApplyLoyaltyToOrder(Order order, RedemptionResult redemption, ApplicationUser? user, LoyaltyTier tier, decimal subtotal)
+        {
+            order.LoyaltyPointsRedeemed = redemption.PointsApplied;
+            order.LoyaltyDiscount = redemption.Discount;
+            order.Total = subtotal - redemption.Discount;
+            if (user != null)
+            {
+                order.LoyaltyPointsEarned = loyalty.CalculateEarnedPoints(subtotal, tier);
+            }
+        }
+
+        // Credits earned points and deducts redeemed points once an order's payment is captured.
+        // Runs inside the single Pending -> Paid transition so the balance moves exactly once.
+        private async Task<int> ApplyRecordedLoyaltyAsync(Order order)
+        {
+            if (string.IsNullOrWhiteSpace(order.Username))
+                return 0;
+
+            var user = await userManager.FindByNameAsync(order.Username);
+            if (user == null)
+                return 0;
+
+            var subtotal = order.Total + order.LoyaltyDiscount;
+            var result = await loyalty.ApplyPurchaseAsync(user, subtotal, order.LoyaltyPointsRedeemed);
+            return result.ReferralBonusPoints;
+        }
+
         // Redeems the gift card recorded on a pending order once its card payment is captured.
         // Runs as part of the single Pending -> Paid transition so the card is charged down once.
         private async Task RedeemRecordedGiftCardAsync(Order order)
@@ -359,18 +436,26 @@ namespace MvcMusicStore.Controllers
             order.GiftCardAmountApplied = applied;
         }
 
-        // Sends the confirmation receipt once an order is paid. A delivery failure must never
-        // surface to the shopper or roll back a captured payment, so failures are only logged.
-        private async Task SendReceiptSafelyAsync(Order order)
+        private int ParseRequestedPoints()
         {
-            try
-            {
-                await emailSender.SendOrderConfirmationAsync(order);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
-            }
+            var raw = Request.Form["PointsToRedeem"].ToString();
+            return int.TryParse(raw, out var value) && value > 0 ? value : 0;
+        }
+
+        private void PopulateLoyaltyViewBag(ApplicationUser? user, decimal subtotal)
+        {
+            var points = user?.LoyaltyPoints ?? 0;
+            var tier = loyalty.GetTier(user?.LifetimeSpend ?? 0m);
+
+            ViewBag.LoyaltyPoints = points;
+            ViewBag.LoyaltyTierName = tier.Name;
+            ViewBag.LoyaltyMultiplier = tier.EarnMultiplier;
+            ViewBag.MaxRedeemablePoints = loyalty.MaxRedeemablePoints(points, subtotal);
+            ViewBag.PointsPerDollarRedeemed = loyalty.Options.PointsPerDollarRedeemed;
+            ViewBag.RedemptionIncrement = loyalty.Options.RedemptionIncrement;
+            ViewBag.PointsPerDollar = loyalty.Options.PointsPerDollar;
+            ViewBag.CartSubtotal = subtotal;
+            ViewBag.ProjectedEarn = loyalty.CalculateEarnedPoints(subtotal, tier);
         }
     }
 }

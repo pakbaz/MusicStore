@@ -48,6 +48,7 @@
             <label class="sr-only" for="sort">Sort</label>
             <select class="form-control" id="sort" name="sort">
                 <option value="popularity_desc" selected="@(Model.Sort == "popularity_desc")">Popularity</option>
+                <option value="rating_desc" selected="@(Model.Sort == "rating_desc")">Top rated</option>
                 <option value="release_desc" selected="@(Model.Sort == "release_desc")">Release date (newest)</option>
                 <option value="release_asc" selected="@(Model.Sort == "release_asc")">Release date (oldest)</option>
                 <option value="price_asc" selected="@(Model.Sort == "price_asc")">Price (low to high)</option>
@@ -82,6 +83,9 @@
                     </a>
                     <small class="text-muted">@album.ArtistName</small>
                     <small class="text-muted">@album.GenreName · @album.Price.ToString("C")</small>
+                    <div class="album-card-rating">
+                        @await Html.PartialAsync("_StarRating", new MvcMusicStore.ViewModels.StarRatingViewModel { Average = album.AverageRating, Count = album.ReviewCount })
+                    </div>
                     <small class="text-muted">Released: @(album.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</small>
                     @if (album.IsAvailable)
                     {

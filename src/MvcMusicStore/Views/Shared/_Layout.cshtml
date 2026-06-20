@@ -68,6 +68,7 @@
                             </button>
                         </li>
                         @await Component.InvokeAsync("CartSummary")
+                        @await Component.InvokeAsync("LoyaltySummary")
                         @await Html.PartialAsync("_LoginPartial")
                     </ul>
                 </div>
