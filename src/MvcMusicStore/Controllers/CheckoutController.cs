@@ -13,11 +13,10 @@ namespace MvcMusicStore.Controllers
     public class CheckoutController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly StoreEmailService storeEmail;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILoyaltyService _loyalty;
         private readonly IGiftCardService giftCards;
-        private readonly IOrderEmailSender emailSender;
-        private readonly ILogger<CheckoutController> logger;
         const string PromoCode = "FREE";
 
         public CheckoutController(
@@ -25,15 +24,13 @@ namespace MvcMusicStore.Controllers
             UserManager<ApplicationUser> userManager,
             ILoyaltyService loyalty,
             IGiftCardService giftCardService,
-            IOrderEmailSender emailSender,
-            ILogger<CheckoutController> logger)
+            StoreEmailService storeEmail)
         {
             storeDB = storeDb;
             _userManager = userManager;
             _loyalty = loyalty;
             giftCards = giftCardService;
-            this.emailSender = emailSender;
-            this.logger = logger;
+            this.storeEmail = storeEmail;
         }
 
         //
@@ -157,15 +154,9 @@ namespace MvcMusicStore.Controllers
                 TempData["ReferralBonus"] = loyaltyResult.ReferralBonusPoints;
             }
 
-            // Send the confirmation receipt. A delivery failure must never fail a placed order.
-            try
-            {
-                await emailSender.SendOrderConfirmationAsync(order);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
-            }
+            // Send the transactional order confirmation. StoreEmailService logs and swallows any
+            // delivery failure internally, so a placed order is never blocked by email.
+            await storeEmail.SendOrderConfirmationAsync(order);
 
             return RedirectToAction("Complete", new { id = order.OrderId });
         }

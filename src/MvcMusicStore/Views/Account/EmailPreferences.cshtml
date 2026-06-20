@@ -1,0 +1,55 @@
+﻿@model MvcMusicStore.Models.EmailPreferencesViewModel
+@{
+    ViewBag.Title = "Email Preferences";
+}
+
+<h2>@ViewBag.Title</h2>
+
+<p class="text-success">@ViewBag.StatusMessage</p>
+
+@using (Html.BeginForm("EmailPreferences", "Account", FormMethod.Post, new { @class = "form-horizontal", role = "form" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.ValidationSummary(true, "", new { @class = "text-danger", role = "alert" })
+
+    <div class="form-group">
+        @Html.LabelFor(m => m.Email, new { @class = "col-md-3 control-label" })
+        <div class="col-md-9">
+            @Html.TextBoxFor(m => m.Email, new { @class = "form-control", @type = "email", @autocomplete = "email" })
+            @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-9">
+            <div class="checkbox">
+                <label>
+                    @Html.CheckBoxFor(m => m.EmailMarketingOptIn)
+                    Newsletters and new-release announcements
+                </label>
+            </div>
+            <div class="checkbox">
+                <label>
+                    @Html.CheckBoxFor(m => m.AbandonedCartOptIn)
+                    Reminders about items left in my cart
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <p class="help-block col-md-offset-3 col-md-9">
+        Order receipts are always sent and are not affected by these settings.
+    </p>
+
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-9">
+            <input type="submit" class="btn btn-primary" value="Save preferences" />
+            <a class="btn btn-default" href="@Url.Action("Manage", "Account")">Back</a>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}
