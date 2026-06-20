@@ -15,6 +15,19 @@
             by @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
         </p>
         <p class="detail-price">@Model.Album.Price.ToString("C")</p>
+        @if (Model.Album.HasPreview)
+        {
+            <div class="album-detail-preview">
+                <h2 class="sr-only">Audio preview</h2>
+                @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                {
+                    PreviewUrl = Model.Album.PreviewUrl!,
+                    DurationSeconds = Model.Album.PreviewDurationSeconds,
+                    Title = Model.Album.Title ?? string.Empty,
+                    Variant = "detail"
+                })
+            </div>
+        }
         <div class="detail-actions">
             <a class="btn btn-primary btn-lg"
                href="@Url.Action("AddToCart", "ShoppingCart", new { id = Model.Album.AlbumId })"

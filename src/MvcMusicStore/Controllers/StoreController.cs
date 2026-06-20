@@ -35,7 +35,9 @@ namespace MvcMusicStore.Controllers
                 AlbumArtUrl = album.GetDisplayThumbnailUrl(),
                 ReleaseDate = album.ReleaseDate,
                 IsAvailable = album.IsAvailable,
-                Popularity = salesByAlbum.TryGetValue(album.AlbumId, out var sold) ? sold : 0
+                Popularity = salesByAlbum.TryGetValue(album.AlbumId, out var sold) ? sold : 0,
+                PreviewUrl = album.PreviewUrl,
+                PreviewDurationSeconds = album.PreviewDurationSeconds
             });
 
             if (!string.IsNullOrWhiteSpace(search))
