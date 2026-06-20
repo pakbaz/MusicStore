@@ -10,7 +10,9 @@ using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Controllers
 {
-    [Authorize]
+    // Guest checkout is allowed: anonymous shoppers can complete a purchase with just an email.
+    // Authenticated users keep the existing behavior (order tied to their account).
+    [AllowAnonymous]
     public class CheckoutController : Controller
     {
         private readonly MusicStoreEntities storeDB;
@@ -121,8 +123,20 @@ namespace MvcMusicStore.Controllers
             var remainingDue = discountedTotal - giftApplied;
 
             order.OrderId = await storeDB.NextOrderIdAsync();
-            order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
+
+            string? guestToken = null;
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                order.Username = User.Identity!.Name!;
+            }
+            else
+            {
+                // Guest order: stamp a random token so the confirmation and download links remain
+                // accessible (including from the emailed link) without requiring an account.
+                guestToken = Guid.NewGuid().ToString("N");
+                order.GuestAccessToken = guestToken;
+            }
 
             var tier = loyalty.GetTier(user?.LifetimeSpend ?? 0m);
 
@@ -163,7 +177,7 @@ namespace MvcMusicStore.Controllers
 
                 await storeEmail.SendOrderConfirmationAsync(order);
 
-                return RedirectToAction("Complete", new { id = order.OrderId });
+                return RedirectToAction("Complete", new { id = order.OrderId, token = guestToken });
             }
 
             // Path 2 — a balance remains and must be paid by card via Stripe Checkout.
@@ -196,7 +210,7 @@ namespace MvcMusicStore.Controllers
 
             try
             {
-                var completeUrl = Url.Action("Complete", "Checkout", new { id = order.OrderId }, Request.Scheme)!;
+                var completeUrl = Url.Action("Complete", "Checkout", new { id = order.OrderId, token = guestToken }, Request.Scheme)!;
                 var successUrl = completeUrl
                     + (completeUrl.Contains('?') ? "&" : "?")
                     + "session_id={CHECKOUT_SESSION_ID}";
@@ -226,10 +240,12 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Checkout/Complete/5  (Stripe success_url, includes session_id)
 
-        public async Task<IActionResult> Complete(int id, [FromQuery(Name = "session_id")] string? sessionId)
+        public async Task<IActionResult> Complete(int id, [FromQuery(Name = "session_id")] string? sessionId, string? token)
         {
-            var order = await FindOrderAsync(id, User.Identity!.Name);
-            if (order == null)
+            // Authenticated owners are matched by username; guests by the access token issued at
+            // checkout (and embedded in the confirmation link/email).
+            var order = await FindOrderAsync(id);
+            if (order == null || !IsOrderAccessible(order, token))
             {
                 ViewBag.ErrorMessage = "We couldn't find that order for your account. Please review your recent orders or try checkout again.";
                 return View("Error");
@@ -283,6 +299,7 @@ namespace MvcMusicStore.Controllers
             ViewBag.NewBalance = viewer?.LoyaltyPoints ?? 0;
             ViewBag.TierName = viewerTier.Name;
             ViewBag.ReferralBonus = referralBonus != 0 ? referralBonus : Convert.ToInt32(TempData["ReferralBonus"] ?? 0);
+            ViewBag.Downloads = await BuildDownloadsAsync(order);
 
             return View(order);
         }
@@ -387,6 +404,55 @@ namespace MvcMusicStore.Controllers
 
             // Cosmos can't translate AnyAsync/FirstOrDefaultAsync predicates here; materialize Take(1).
             return (await query.Take(1).ToListAsync()).FirstOrDefault();
+        }
+
+        // Authorizes access to an order's confirmation page: the authenticated owner (username
+        // match) or anyone presenting the guest access token issued when the order was placed.
+        private bool IsOrderAccessible(Order order, string? token)
+        {
+            if (User.Identity?.IsAuthenticated == true &&
+                string.Equals(order.Username, User.Identity!.Name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return !string.IsNullOrEmpty(token) &&
+                   !string.IsNullOrEmpty(order.GuestAccessToken) &&
+                   string.Equals(order.GuestAccessToken, token, StringComparison.Ordinal);
+        }
+
+        // Builds digital download links (title -> absolute URL) for the order's albums that carry
+        // audio. An album with an AudioUrl is a digital item the buyer can download immediately.
+        private async Task<List<KeyValuePair<string, string>>> BuildDownloadsAsync(Order order)
+        {
+            var downloads = new List<KeyValuePair<string, string>>();
+            foreach (var detail in order.OrderDetails ?? new List<OrderDetail>())
+            {
+                var album = (await storeDB.Albums
+                    .Where(a => a.AlbumId == detail.AlbumId)
+                    .Take(1)
+                    .ToListAsync()).FirstOrDefault();
+                if (album != null && !string.IsNullOrWhiteSpace(album.AudioUrl))
+                {
+                    downloads.Add(new KeyValuePair<string, string>(
+                        album.Title ?? $"Album #{detail.AlbumId}",
+                        ToAbsoluteUrl(album.AudioUrl!)));
+                }
+            }
+
+            return downloads;
+        }
+
+        private string ToAbsoluteUrl(string url)
+        {
+            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return url;
+            }
+
+            var path = url.StartsWith('/') ? url : "/" + url;
+            return $"{Request.Scheme}://{Request.Host}{path}";
         }
 
         // Records the loyalty redemption/discount and earned points on the order. The points

@@ -86,4 +86,29 @@ namespace MvcMusicStore.Models
         [Display(Name = "Reminders about items left in my cart")]
         public bool AbandonedCartOptIn { get; set; }
     }
+
+    // Used by the optional post-purchase account creation offered to guests on the checkout
+    // confirmation page. The order is linked to the new account when OrderId + Token match the
+    // just-placed guest order.
+    public class GuestOrderRegisterViewModel
+    {
+        [Required]
+        [Display(Name = "User name")]
+        public string? UserName { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string? Password { get; set; }
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string? ConfirmPassword { get; set; }
+
+        public int OrderId { get; set; }
+
+        public string? Token { get; set; }
+    }
 }

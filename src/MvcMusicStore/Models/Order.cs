@@ -17,6 +17,12 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public string? Username { get; set; }
 
+        // Random token stamped on guest (anonymous) orders so the confirmation and download
+        // links remain accessible across sessions (e.g. from the confirmation email) without
+        // requiring an account. Cleared once the order is linked to a registered account.
+        [ScaffoldColumn(false)]
+        public string? GuestAccessToken { get; set; }
+
         [Required]
         [DisplayName("First Name")]
         [StringLength(160)]

@@ -14,6 +14,16 @@
     @Html.ValidationSummary(true, string.Empty, new { @class = "text-danger", role = "alert" })
 
     <h2>Address And Payment</h2>
+
+    @if (User.Identity?.IsAuthenticated != true)
+    {
+        <p class="text-muted">
+            You're checking out as a guest, no account required.
+            Already have an account?
+            <a href="@Url.Action("Login", "Account", new { returnUrl = Url.Action("AddressAndPayment", "Checkout") })">Log in</a>.
+        </p>
+    }
+
     <fieldset class="form-horizontal">
         <legend>Shipping Information</legend>
 

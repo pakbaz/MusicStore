@@ -10,6 +10,8 @@
     decimal loyaltyDiscount = (decimal)(ViewBag.LoyaltyDiscount ?? 0m);
     decimal orderTotal = (decimal)(ViewBag.OrderTotal ?? Model.Total);
     string tierName = ViewBag.TierName as string ?? "Bronze";
+    var downloads = ViewBag.Downloads as List<KeyValuePair<string, string>> ?? new List<KeyValuePair<string, string>>();
+    bool isGuest = string.IsNullOrEmpty(Model.Username) && User.Identity?.IsAuthenticated != true;
 }
 
 <h2>Checkout Complete</h2>
@@ -85,6 +87,21 @@
     </tfoot>
 </table>
 
+@if (Model.PaymentStatus == PaymentStatus.Paid && downloads.Count > 0)
+{
+    <h3>Your downloads</h3>
+    <p>Your digital items are ready. These links are also in your confirmation email.</p>
+    <ul class="list-unstyled">
+        @foreach (var download in downloads)
+        {
+            <li>
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span>
+                <a href="@download.Value" download>@download.Key</a>
+            </li>
+        }
+    </ul>
+}
+
 @if (Model.GiftCardAmountApplied > 0)
 {
     <div class="panel panel-default">
@@ -131,8 +148,23 @@
     </div>
 }
 
+@if (isGuest && !string.IsNullOrEmpty(Model.GuestAccessToken) &&
+     (Model.PaymentStatus == PaymentStatus.Paid || Model.PaymentStatus == PaymentStatus.Pending))
+{
+    <div class="panel panel-info">
+        <div class="panel-heading"><strong>Create an account</strong></div>
+        <div class="panel-body">
+            <p>Want your order history and downloads in one place? Create an account and we'll link this order automatically.</p>
+            <a class="btn btn-primary" href="@Url.Action("RegisterFromOrder", "Account", new { orderId = Model.OrderId, token = Model.GuestAccessToken, email = Model.Email })">Create account</a>
+        </div>
+    </div>
+}
+
 <p>
-    <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>
-    <a class="btn btn-default" href="@Url.Action("Index", "Order")">My orders</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>
+        <a class="btn btn-default" href="@Url.Action("Index", "Order")">My orders</a>
+    }
     <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
 </p>
