@@ -117,6 +117,10 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
+// Gift cards and gifting: simulated email delivery + gift-card issuance/redemption.
+builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+builder.Services.AddScoped<IGiftCardService, GiftCardService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

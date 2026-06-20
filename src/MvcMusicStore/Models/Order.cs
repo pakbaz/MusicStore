@@ -63,6 +63,20 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
+        // Gift-card / gifting fields. These are populated server-side (they are not part of the
+        // [Bind] list above, so they are never model-bound from the checkout address form).
+        [ScaffoldColumn(false)]
+        public string? GiftCardCode { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal GiftCardAmountApplied { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal AmountDue { get; set; }
+
+        [ScaffoldColumn(false)]
+        public bool IsGift { get; set; }
+
         public List<OrderDetail>? OrderDetails { get; set; }
     }
 }
