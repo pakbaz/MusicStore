@@ -14,7 +14,25 @@
         <p class="detail-artist">
             by @Html.ActionLink(Model.Album.Artist!.Name, "Artist", "Store", new { id = Model.Album.ArtistId }, null)
         </p>
-        <p class="detail-price">@Model.Album.Price.ToString("C")</p>
+        @{
+            var detailPricing = Model.Pricing ?? MvcMusicStore.Services.AlbumPricing.NoSale(Model.Album.AlbumId, Model.Album.Price);
+        }
+        @if (detailPricing.IsOnSale)
+        {
+            <p class="detail-price detail-price-sale">
+                <span class="price-was">@detailPricing.OriginalPrice.ToString("C")</span>
+                <span class="price-now">@detailPricing.EffectivePrice.ToString("C")</span>
+                <span class="sale-badge">@(detailPricing.PercentOff is int pct ? $"{pct}% off" : "Sale")</span>
+            </p>
+            @if (!string.IsNullOrEmpty(detailPricing.SaleName))
+            {
+                <p class="detail-sale-name">@detailPricing.SaleName</p>
+            }
+        }
+        else
+        {
+            <p class="detail-price">@detailPricing.EffectivePrice.ToString("C")</p>
+        }
         <div class="detail-actions">
             <a class="btn btn-primary btn-lg"
                href="@Url.Action("AddToCart", "ShoppingCart", new { id = Model.Album.AlbumId })"
@@ -42,15 +60,7 @@
         <div class="album-grid">
         @foreach (var album in Model.RelatedByGenre)
         {
-            <article class="album-card">
-                <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                    <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
-                    <div class="album-card-body">
-                        <h3 class="album-title">@album.Title</h3>
-                        <p class="album-price">@album.Artist?.Name</p>
-                    </div>
-                </a>
-            </article>
+            @await Html.PartialAsync("_AlbumCard", MvcMusicStore.ViewModels.AlbumCardViewModel.FromAlbum(album, Model.RelatedPricing, album.Artist?.Name))
         }
         </div>
     }
@@ -69,15 +79,7 @@
         <div class="album-grid">
         @foreach (var album in Model.MoreFromArtist)
         {
-            <article class="album-card">
-                <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
-                    <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
-                    <div class="album-card-body">
-                        <h3 class="album-title">@album.Title</h3>
-                        <p class="album-price">@album.Genre?.Name</p>
-                    </div>
-                </a>
-            </article>
+            @await Html.PartialAsync("_AlbumCard", MvcMusicStore.ViewModels.AlbumCardViewModel.FromAlbum(album, Model.RelatedPricing, album.Genre?.Name))
         }
         </div>
     }

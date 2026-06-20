@@ -2,6 +2,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
@@ -9,10 +10,12 @@ namespace MvcMusicStore.Controllers
     public class ShoppingCartController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IPromotionService promotions;
 
-        public ShoppingCartController(MusicStoreEntities storeDb)
+        public ShoppingCartController(MusicStoreEntities storeDb, IPromotionService promotions)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
         }
 
         //
@@ -21,17 +24,25 @@ namespace MvcMusicStore.Controllers
         public async Task<IActionResult> Index()
         {
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            var cartItems = await cart.GetCartItemsAsync();
+            var pricing = await promotions.PriceCartAsync(cartItems, GetSessionDiscountCode());
 
-            // Set up our ViewModel
+            // A stored code that has since expired or hit its limit is dropped silently here.
+            if (!string.IsNullOrEmpty(GetSessionDiscountCode()) && !pricing.DiscountApplied)
+            {
+                ClearSessionDiscountCode();
+            }
+
             var viewModel = new ShoppingCartViewModel
             {
-                CartItems = await cart.GetCartItemsAsync(),
-                CartTotal = await cart.GetTotalAsync()
+                CartItems = cartItems,
+                Pricing = pricing,
+                CartTotal = pricing.Total,
+                DiscountMessage = TempData["DiscountMessage"] as string
             };
 
             ViewBag.CartMessage = TempData["CartMessage"];
 
-            // Return the view
             return View(viewModel);
         }
 
@@ -52,6 +63,43 @@ namespace MvcMusicStore.Controllers
             await storeDB.SaveChangesAsync();
 
             // Go back to the main store page for more shopping
+            return RedirectToAction("Index");
+        }
+
+        //
+        // POST: /ShoppingCart/ApplyDiscount
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApplyDiscount(string? code)
+        {
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            var pricing = await promotions.PriceCartAsync(await cart.GetCartItemsAsync(), code);
+
+            if (pricing.DiscountApplied)
+            {
+                SetSessionDiscountCode(pricing.AppliedCode!);
+                TempData["DiscountMessage"] = pricing.DiscountMessage;
+            }
+            else
+            {
+                ClearSessionDiscountCode();
+                TempData["DiscountMessage"] = pricing.DiscountMessage
+                    ?? "That discount code could not be applied.";
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        //
+        // POST: /ShoppingCart/RemoveDiscount
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult RemoveDiscount()
+        {
+            ClearSessionDiscountCode();
+            TempData["DiscountMessage"] = "Discount code removed.";
             return RedirectToAction("Index");
         }
 
@@ -77,15 +125,11 @@ namespace MvcMusicStore.Controllers
 
             await storeDB.SaveChangesAsync();
 
-            var itemSubtotal = itemCount > 0
-                ? (cartItem.Album?.Price ?? decimal.Zero) * itemCount
-                : decimal.Zero;
-
             var message = itemCount > 0
                 ? $"1 copy of {albumName} has been removed from your shopping cart."
                 : $"{albumName} has been removed from your shopping cart.";
 
-            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
+            return Json(await BuildCartResponseAsync(cart, id, message));
         }
 
         [HttpPost]
@@ -105,38 +149,60 @@ namespace MvcMusicStore.Controllers
             }
 
             var albumName = cartItem.Album?.Title ?? "This album";
-            var unitPrice = cartItem.Album?.Price ?? decimal.Zero;
             var itemCount = await cart.UpdateCartItemCountAsync(id, count);
 
             await storeDB.SaveChangesAsync();
 
-            var itemSubtotal = unitPrice * itemCount;
             var message = itemCount == 0
                 ? $"{albumName} has been removed from your shopping cart."
                 : $"{albumName} quantity has been updated to {itemCount}.";
 
-            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
+            return Json(await BuildCartResponseAsync(cart, id, message));
         }
 
-        private async Task<ShoppingCartRemoveViewModel> BuildCartResponseAsync(ShoppingCart cart, int id, int itemCount, decimal itemSubtotal, string message)
+        private async Task<ShoppingCartRemoveViewModel> BuildCartResponseAsync(ShoppingCart cart, int id, string message)
         {
-            var cartItems = (await cart.GetCartItemsAsync())
-                .Where(item => item.Album != null)
-                .OrderBy(item => item.Album!.Title)
-                .ToList();
+            var cartItems = await cart.GetCartItemsAsync();
+            var pricing = await promotions.PriceCartAsync(cartItems, GetSessionDiscountCode());
 
-            var cartSummary = string.Join("\n", cartItems.Select(item => $"{item.Album!.Title} x{item.Count}"));
+            // Drop a now-invalid stored code so totals stay honest.
+            if (!string.IsNullOrEmpty(GetSessionDiscountCode()) && !pricing.DiscountApplied)
+            {
+                ClearSessionDiscountCode();
+            }
+
+            var line = pricing.Lines.FirstOrDefault(l => l.RecordId == id);
+            var itemCount = line?.Quantity ?? 0;
+            var itemSubtotal = line?.LineSubtotal ?? decimal.Zero;
+
+            var summaryLines = pricing.Lines
+                .OrderBy(l => l.Title)
+                .Select(l => $"{l.Title} x{l.Quantity}");
+            var cartSummary = string.Join("\n", summaryLines);
 
             return new ShoppingCartRemoveViewModel
             {
                 Message = message,
-                CartTotal = await cart.GetTotalAsync(),
-                CartCount = await cart.GetCountAsync(),
+                CartTotal = pricing.Total,
+                CartCount = pricing.Lines.Sum(l => l.Quantity),
                 ItemCount = itemCount,
                 ItemSubtotal = itemSubtotal,
                 CartSummary = cartSummary,
-                DeleteId = id
+                DeleteId = id,
+                Subtotal = pricing.Subtotal,
+                DiscountAmount = pricing.DiscountAmount,
+                DiscountCode = pricing.AppliedCode,
+                DiscountApplied = pricing.DiscountApplied
             };
         }
+
+        private string? GetSessionDiscountCode() =>
+            HttpContext.Session.GetString(ShoppingCart.DiscountCodeSessionKey);
+
+        private void SetSessionDiscountCode(string code) =>
+            HttpContext.Session.SetString(ShoppingCart.DiscountCodeSessionKey, code);
+
+        private void ClearSessionDiscountCode() =>
+            HttpContext.Session.Remove(ShoppingCart.DiscountCodeSessionKey);
     }
 }

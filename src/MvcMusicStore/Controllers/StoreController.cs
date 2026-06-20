@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
@@ -8,10 +9,12 @@ namespace MvcMusicStore.Controllers
     public class StoreController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IPromotionService promotions;
 
-        public StoreController(MusicStoreEntities storeDb)
+        public StoreController(MusicStoreEntities storeDb, IPromotionService promotions)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
         }
 
         //
@@ -24,6 +27,7 @@ namespace MvcMusicStore.Controllers
 
             var albums = await storeDB.Albums.ToListAsync();
             var salesByAlbum = await GetSalesByAlbumAsync();
+            var pricingLookup = await promotions.GetPricingLookupAsync(albums);
 
             IEnumerable<CatalogAlbumItemViewModel> items = albums.Select(album => new CatalogAlbumItemViewModel
             {
@@ -32,6 +36,8 @@ namespace MvcMusicStore.Controllers
                 ArtistName = album.ArtistName ?? string.Empty,
                 GenreName = album.GenreName ?? string.Empty,
                 Price = album.Price,
+                EffectivePrice = pricingLookup.TryGetValue(album.AlbumId, out var pricing) ? pricing.EffectivePrice : album.Price,
+                SaleName = pricingLookup.TryGetValue(album.AlbumId, out var salePricing) ? salePricing.SaleName : null,
                 AlbumArtUrl = album.GetDisplayThumbnailUrl(),
                 ReleaseDate = album.ReleaseDate,
                 IsAvailable = album.IsAvailable,
@@ -158,11 +164,17 @@ namespace MvcMusicStore.Controllers
                 .ToList();
             moreFromArtist.PopulateNavigation();
 
+            var albumPricing = await promotions.GetPricingAsync(album);
+            var relatedPricing = await promotions.GetPricingLookupAsync(
+                relatedByGenre.Concat(moreFromArtist));
+
             var viewModel = new AlbumDetailsViewModel
             {
                 Album = album,
+                Pricing = albumPricing,
                 RelatedByGenre = relatedByGenre,
-                MoreFromArtist = moreFromArtist
+                MoreFromArtist = moreFromArtist,
+                RelatedPricing = relatedPricing
             };
 
             return View(viewModel);

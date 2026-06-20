@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Models
 {
@@ -19,6 +20,9 @@ namespace MvcMusicStore.Models
         }
 
         public const string CartSessionKey = "CartId";
+
+        // Session slot holding the discount code a shopper applied in the cart, carried into checkout.
+        public const string DiscountCodeSessionKey = "DiscountCode";
 
         public static ShoppingCart GetCart(MusicStoreEntities db, HttpContext context)
         {
@@ -133,35 +137,33 @@ namespace MvcMusicStore.Models
             return cartItems.Sum(item => item.Count * item.AlbumPrice);
         }
 
-        public async Task<int> CreateOrderAsync(Order order)
+        /// <summary>
+        /// Builds the order from a pre-computed <see cref="CartPricing"/> (sale-adjusted unit
+        /// prices plus any applied discount code) and empties the cart.
+        /// </summary>
+        public async Task<int> CreateOrderAsync(Order order, CartPricing pricing)
         {
-            decimal orderTotal = 0;
-
-            var cartItems = await GetCartItemsAsync();
             order.OrderDetails ??= new List<OrderDetail>();
 
             var orderDetailId = 1;
 
-            // Iterate over the items in the cart, adding the order details for each
-            foreach (var item in cartItems)
+            // Persist the sale-adjusted unit price each line was actually charged at.
+            foreach (var line in pricing.Lines)
             {
-                var orderDetail = new OrderDetail
+                order.OrderDetails.Add(new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
-                    AlbumId = item.AlbumId,
+                    AlbumId = line.AlbumId,
                     OrderId = order.OrderId,
-                    UnitPrice = item.AlbumPrice,
-                    Quantity = item.Count,
-                };
-
-                // Set the order total of the shopping cart
-                orderTotal += (item.Count * item.AlbumPrice);
-
-                order.OrderDetails.Add(orderDetail);
+                    UnitPrice = line.EffectiveUnitPrice,
+                    Quantity = line.Quantity
+                });
             }
 
-            // Set the order's total to the orderTotal count
-            order.Total = orderTotal;
+            order.Subtotal = pricing.Subtotal;
+            order.DiscountCode = pricing.AppliedCode;
+            order.DiscountAmount = pricing.DiscountAmount;
+            order.Total = pricing.Total;
 
             // Empty the shopping cart
             await EmptyCartAsync();

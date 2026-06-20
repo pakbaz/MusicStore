@@ -9,25 +9,80 @@ namespace MvcMusicStore.Models
     {
         public static async Task SeedAsync(MusicStoreEntities context)
         {
-            // Only seed if no data exists. Cosmos translates AnyAsync() into an EXISTS subquery
-            // ("SELECT ... FROM root c") that Cosmos rejects with "Identifier 'root' could not be
-            // resolved", so test for existing data with a Take(1) materialization instead.
+            // Only seed the catalog if no data exists. Cosmos translates AnyAsync() into an EXISTS
+            // subquery ("SELECT ... FROM root c") that Cosmos rejects with "Identifier 'root' could
+            // not be resolved", so test for existing data with a Take(1) materialization instead.
             var alreadySeeded = (await context.Genres.Select(g => g.GenreId).Take(1).ToListAsync()).Count != 0;
-            if (alreadySeeded)
-                return;
+            if (!alreadySeeded)
+            {
+                const string imgUrl = "~/Images/placeholder.svg";
 
-            const string imgUrl = "~/Images/placeholder.svg";
+                var genres = AddGenres(context);
+                var artists = AddArtists(context);
 
-            var genres = AddGenres(context);
-            var artists = AddArtists(context);
+                // Cosmos uses client-assigned int keys (ValueGenerated.Never), so every Album must have
+                // a unique AlbumId assigned BEFORE it is tracked. Build the albums in a detached list,
+                // assign keys + denormalized fields, then AddRange so no two entities collide on key 0.
+                var albums = BuildAlbums(imgUrl, genres, artists);
+                AssignAlbumKeys(albums);
+                AddAlbumCatalogMetadata(albums);
+                context.Albums.AddRange(albums);
 
-            // Cosmos uses client-assigned int keys (ValueGenerated.Never), so every Album must have
-            // a unique AlbumId assigned BEFORE it is tracked. Build the albums in a detached list,
-            // assign keys + denormalized fields, then AddRange so no two entities collide on key 0.
-            var albums = BuildAlbums(imgUrl, genres, artists);
-            AssignAlbumKeys(albums);
-            AddAlbumCatalogMetadata(albums);
-            context.Albums.AddRange(albums);
+                await context.SaveChangesAsync();
+            }
+
+            // Promotions seed independently so the demo code + Deal of the Day appear even when the
+            // catalog was seeded by an earlier build. Each has its own empty-container guard.
+            await SeedPromotionsAsync(context);
+        }
+
+        private static async Task SeedPromotionsAsync(MusicStoreEntities context)
+        {
+            var now = DateTime.UtcNow;
+
+            // Seed the demo SAVE20 code only when no discount codes exist yet.
+            var hasDiscountCodes = (await context.DiscountCodes.Select(c => c.DiscountCodeId).Take(1).ToListAsync()).Count != 0;
+            if (!hasDiscountCodes)
+            {
+                context.DiscountCodes.Add(new DiscountCode
+                {
+                    DiscountCodeId = await context.NextDiscountCodeIdAsync(),
+                    Code = DiscountCode.Normalize("SAVE20"),
+                    Description = "20% off orders of $20 or more",
+                    DiscountType = DiscountType.Percentage,
+                    Value = 20m,
+                    MinimumSpend = 20m,
+                    UsageLimit = null,
+                    TimesUsed = 0,
+                    IsActive = true
+                });
+            }
+
+            // Seed a featured "Deal of the Day" only when no sales exist yet.
+            var hasSales = (await context.Sales.Select(s => s.SaleId).Take(1).ToListAsync()).Count != 0;
+            if (!hasSales)
+            {
+                var albums = await context.Albums.ToListAsync();
+                var target = albums.FirstOrDefault(a => a.IsFeatured)
+                    ?? albums.OrderByDescending(a => a.Price).FirstOrDefault();
+
+                if (target is not null)
+                {
+                    context.Sales.Add(new Sale
+                    {
+                        SaleId = await context.NextSaleIdAsync(),
+                        Name = "Deal of the Day",
+                        DiscountType = DiscountType.Percentage,
+                        Value = 30m,
+                        StartDateUtc = now.AddHours(-1),
+                        EndDateUtc = now.AddHours(24),
+                        IsActive = true,
+                        IsFeatured = true,
+                        AppliesToEntireStore = false,
+                        AlbumIds = new List<int> { target.AlbumId }
+                    });
+                }
+            }
 
             await context.SaveChangesAsync();
         }

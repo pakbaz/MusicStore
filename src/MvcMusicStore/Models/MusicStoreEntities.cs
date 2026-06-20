@@ -14,6 +14,8 @@ namespace MvcMusicStore.Models
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<DiscountCode> DiscountCodes { get; set; }
+        public DbSet<Sale>      Sales { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -59,6 +61,18 @@ namespace MvcMusicStore.Models
                 });
             });
 
+            modelBuilder.Entity<DiscountCode>(b =>
+            {
+                b.ToContainer("DiscountCodes");
+                b.HasKey(c => c.DiscountCodeId);
+            });
+
+            modelBuilder.Entity<Sale>(b =>
+            {
+                b.ToContainer("Sales");
+                b.HasKey(s => s.SaleId);
+            });
+
             // The Azure Cosmos DB provider does not support index definitions; strip any conventional indexes.
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
@@ -96,6 +110,18 @@ namespace MvcMusicStore.Models
         public async Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextDiscountCodeIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await DiscountCodes.Select(c => c.DiscountCodeId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextSaleIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await Sales.Select(s => s.SaleId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 1 : ids.Max() + 1;
         }
     }

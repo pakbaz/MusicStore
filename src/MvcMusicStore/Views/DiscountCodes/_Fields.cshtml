@@ -1,0 +1,79 @@
+﻿@model MvcMusicStore.Models.DiscountCode
+
+<div class="form-group">
+    @Html.LabelFor(m => m.Code, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.Code, new { @class = "form-control", placeholder = "SAVE20", autocomplete = "off" })
+        @Html.ValidationMessageFor(m => m.Code)
+        <p class="help-block">Letters, numbers, hyphens or underscores. Stored in uppercase.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.Description, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.Description, new { @class = "form-control", placeholder = "20% off your order" })
+        @Html.ValidationMessageFor(m => m.Description)
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.DiscountType, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.DropDownListFor(m => m.DiscountType, Html.GetEnumSelectList<MvcMusicStore.Models.DiscountType>(), new { @class = "form-control" })
+        @Html.ValidationMessageFor(m => m.DiscountType)
+        <p class="help-block">Percentage values are 0–100. Fixed amounts are in dollars.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.Value, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.Value, new { @class = "form-control", type = "number", step = "0.01", min = "0.01" })
+        @Html.ValidationMessageFor(m => m.Value)
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.MinimumSpend, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.MinimumSpend, new { @class = "form-control", type = "number", step = "0.01", min = "0" })
+        @Html.ValidationMessageFor(m => m.MinimumSpend)
+        <p class="help-block">Optional. Leave blank for no minimum.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.StartDateUtc, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.StartDateUtc, "{0:yyyy-MM-ddTHH:mm}", new { @class = "form-control", type = "datetime-local" })
+        @Html.ValidationMessageFor(m => m.StartDateUtc)
+        <p class="help-block">Optional. Leave blank to start immediately.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.EndDateUtc, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.EndDateUtc, "{0:yyyy-MM-ddTHH:mm}", new { @class = "form-control", type = "datetime-local" })
+        @Html.ValidationMessageFor(m => m.EndDateUtc)
+        <p class="help-block">Optional. Leave blank for no expiry.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.UsageLimit, new { @class = "control-label col-md-3" })
+    <div class="col-md-7">
+        @Html.TextBoxFor(m => m.UsageLimit, new { @class = "form-control", type = "number", step = "1", min = "1" })
+        @Html.ValidationMessageFor(m => m.UsageLimit)
+        <p class="help-block">Optional. Maximum total redemptions.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    <div class="col-md-offset-3 col-md-7 checkbox">
+        <label>
+            @Html.CheckBoxFor(m => m.IsActive) Active
+        </label>
+    </div>
+</div>

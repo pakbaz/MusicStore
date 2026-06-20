@@ -16,7 +16,9 @@
 <h2>Index</h2>
 
 <p>
-    @Html.ActionLink("Create New", "Create")
+    @Html.ActionLink("Create New", "Create", null, new { @class = "btn btn-primary" })
+    @Html.ActionLink("Discount codes", "Index", "DiscountCodes", null, new { @class = "btn btn-default" })
+    @Html.ActionLink("Sales & Deal of the Day", "Index", "Sales", null, new { @class = "btn btn-default" })
 </p>
 <table class="table">
     <tr>

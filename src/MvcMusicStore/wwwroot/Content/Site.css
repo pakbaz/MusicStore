@@ -1162,3 +1162,285 @@ input[type="checkbox"].input-validation-error {
 .ai-originality { color: var(--text-muted); font-style: italic; font-size: 13px; }
 .ai-result-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
 .ai-error-actions { margin-top: 10px; }
+
+/* --------------------------------------------------------------------------
+   Promotions — sale badges, slashed prices, Deal of the Day, discounts
+   -------------------------------------------------------------------------- */
+
+.sale-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--danger);
+    color: #fff;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: var(--radius-pill);
+    padding: 3px 10px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.sale-badge-overlay {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 2;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.price-was {
+    color: var(--text-faint);
+    text-decoration: line-through;
+    margin-right: 8px;
+    font-weight: 500;
+}
+
+.price-now {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.album-card-media {
+    position: relative;
+    overflow: hidden;
+}
+
+.album-subtitle {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.album-subtitle + .album-price { margin-top: 4px; }
+
+/* Catalog thumbnail wrapper (Store/Index) so the badge can overlay the art */
+#album-list .album-thumb {
+    position: relative;
+    display: block;
+    overflow: hidden;
+}
+
+#album-list .album-thumb > img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    background: var(--bg-2);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#album-list > li:hover .album-thumb > img { transform: scale(1.05); }
+
+/* Album detail sale pricing */
+.detail-price-sale {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.detail-price-sale .price-was {
+    font-size: 22px;
+    margin-right: 0;
+}
+
+.detail-price-sale .price-now {
+    font-family: var(--font-display);
+    font-size: 34px;
+    letter-spacing: -0.02em;
+}
+
+.detail-sale-name {
+    margin: -12px 0 20px;
+    color: var(--accent-text);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* Deal of the Day panel */
+.deal-panel {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 32px;
+    align-items: center;
+    overflow: hidden;
+    background:
+        radial-gradient(120% 140% at 0% 0%, rgba(255, 107, 107, 0.18), transparent 55%),
+        linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 40px;
+    margin-bottom: 34px;
+    box-shadow: var(--shadow-card);
+    animation: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.deal-copy { position: relative; z-index: 1; }
+
+.deal-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 107, 107, 0.14);
+    color: var(--danger);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    padding: 7px 14px;
+    margin-bottom: 16px;
+}
+
+.deal-kicker::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 12px var(--danger);
+}
+
+.deal-title {
+    margin: 0 0 6px;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+}
+
+.deal-artist {
+    color: var(--text-muted);
+    font-size: 16px;
+    margin-bottom: 16px;
+}
+
+.deal-pricing {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.deal-pricing .price-was { font-size: 20px; margin-right: 0; }
+
+.deal-pricing .price-now {
+    font-family: var(--font-display);
+    font-size: 32px;
+    letter-spacing: -0.02em;
+}
+
+.deal-percent {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
+}
+
+.deal-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    margin-bottom: 22px;
+}
+
+.deal-countdown-label {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.deal-countdown-clock {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.deal-expired .deal-countdown-clock { color: var(--text-faint); }
+
+.deal-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.deal-media {
+    position: relative;
+    z-index: 1;
+}
+
+.deal-media img {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 20px;
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 26px 54px rgba(0, 0, 0, 0.55);
+}
+
+.deal-media-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* Cart + checkout discount UI */
+.discount-panel {
+    margin-top: 18px;
+    padding: 18px 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.discount-form .form-group { margin-right: 12px; }
+.discount-form .control-label { margin-right: 8px; }
+
+.discount-applied {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.discount-applied-text { color: var(--text-muted); }
+
+.checkout-summary .sale-badge { margin-left: 6px; }
+
+@media (max-width: 991px) {
+    .deal-panel {
+        grid-template-columns: 1fr;
+        padding: 28px;
+    }
+
+    .deal-media { order: -1; }
+    .deal-media img { max-width: 280px; }
+}
+
+.admin-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.admin-heading p { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; }

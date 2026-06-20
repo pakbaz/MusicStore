@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Controllers
 {
@@ -11,11 +12,12 @@ namespace MvcMusicStore.Controllers
     public class CheckoutController : Controller
     {
         private readonly MusicStoreEntities storeDB;
-        const string PromoCode = "FREE";
+        private readonly IPromotionService promotions;
 
-        public CheckoutController(MusicStoreEntities storeDb)
+        public CheckoutController(MusicStoreEntities storeDb, IPromotionService promotions)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
         }
 
         //
@@ -24,12 +26,14 @@ namespace MvcMusicStore.Controllers
         public async Task<IActionResult> AddressAndPayment()
         {
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-            if (await cart.GetCountAsync() == 0)
+            var cartItems = await cart.GetCartItemsAsync();
+            if (cartItems.Count == 0)
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
             }
 
+            ViewBag.Pricing = await promotions.PriceCartAsync(cartItems, GetSessionDiscountCode());
             return View(new Order());
         }
 
@@ -39,37 +43,42 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         public async Task<IActionResult> AddressAndPayment(Order order)
         {
-            if (!ModelState.IsValid)
-                return View(order);
-
-            // Check promo code from form
-            var promoCode = Request.Form["PromoCode"].ToString();
-            if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
-            {
-                ViewBag.PromoCode = promoCode;
-                ModelState.AddModelError("PromoCode", "Please enter the valid promo code to place your order.");
-                return View(order);
-            }
-
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-            if (await cart.GetCountAsync() == 0)
+            var cartItems = await cart.GetCartItemsAsync();
+            if (cartItems.Count == 0)
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
+            }
+
+            // Re-price against live sales + the code held in session (it may have expired since the cart).
+            var pricing = await promotions.PriceCartAsync(cartItems, GetSessionDiscountCode());
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Pricing = pricing;
+                return View(order);
             }
 
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
 
-            // Process the order (builds embedded order details and empties the cart)
-            await cart.CreateOrderAsync(order);
+            // Builds embedded order details at the charged (sale-adjusted) prices, records the
+            // discount, sets the total, and empties the cart.
+            await cart.CreateOrderAsync(order, pricing);
 
-            // Add the order
             storeDB.Orders.Add(order);
 
-            // Save all changes
+            // Redeem the coupon (same tracked DbContext, persisted in the SaveChanges below).
+            if (pricing.AppliedDiscountCode is { } redeemedCode)
+            {
+                redeemedCode.TimesUsed += 1;
+            }
+
             await storeDB.SaveChangesAsync();
+
+            ClearSessionDiscountCode();
 
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
@@ -97,5 +106,11 @@ namespace MvcMusicStore.Controllers
             ViewBag.ErrorMessage = "We couldn't find that order for your account. Please review your recent orders or try checkout again.";
             return View("Error");
         }
+
+        private string? GetSessionDiscountCode() =>
+            HttpContext.Session.GetString(ShoppingCart.DiscountCodeSessionKey);
+
+        private void ClearSessionDiscountCode() =>
+            HttpContext.Session.Remove(ShoppingCart.DiscountCodeSessionKey);
     }
 }

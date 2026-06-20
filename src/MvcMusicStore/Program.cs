@@ -117,6 +117,9 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
+// Promotions engine: sale pricing, discount-code validation, and the featured Deal of the Day.
+builder.Services.AddScoped<IPromotionService, PromotionService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -61,6 +61,16 @@ namespace MvcMusicStore.Models
         public string? Email { get; set; }
 
         [ScaffoldColumn(false)]
+        public decimal Subtotal { get; set; }
+
+        [ScaffoldColumn(false)]
+        [DisplayName("Discount Code")]
+        public string? DiscountCode { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal DiscountAmount { get; set; }
+
+        [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
         public List<OrderDetail>? OrderDetails { get; set; }
