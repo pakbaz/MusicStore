@@ -11,5 +11,8 @@ namespace MvcMusicStore.ViewModels
         public List<Album> MoreFromArtist { get; set; } = new();
         public IReadOnlyDictionary<int, AlbumPricing> RelatedPricing { get; set; } =
             new Dictionary<int, AlbumPricing>();
+        public List<Album> AlsoBought { get; set; } = new();
+        public List<Bundle> Bundles { get; set; } = new();
+        public AlbumReviewsViewModel Reviews { get; set; } = new();
     }
 }

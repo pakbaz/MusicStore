@@ -16,5 +16,10 @@ namespace MvcMusicStore.ViewModels
 
         /// <summary>Status message from the most recent apply/remove discount action.</summary>
         public string? DiscountMessage { get; set; }
+
+        public int CartCount        { get; set; }
+        public List<Album> Recommendations { get; set; } = new();
+        public List<Bundle> SuggestedBundles { get; set; } = new();
+        public string? Message      { get; set; }
     }
 }

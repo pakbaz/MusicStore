@@ -28,12 +28,28 @@ namespace MvcMusicStore.Models
                 AddAlbumCatalogMetadata(albums);
                 context.Albums.AddRange(albums);
 
+                context.GiftCards.Add(BuildDemoGiftCard());
+
+                await context.SaveChangesAsync();
+
+                // Seed a few discounted bundles plus a small set of co-purchase orders so the
+                // "Complete the set" and "Customers also bought" surfaces are meaningful out of the box.
+                var bundles = BuildSampleBundles(albums);
+                context.Bundles.AddRange(bundles);
+
+                var orders = BuildSampleOrders(albums, bundles);
+                context.Orders.AddRange(orders);
+
                 await context.SaveChangesAsync();
             }
 
             // Promotions seed independently so the demo code + Deal of the Day appear even when the
             // catalog was seeded by an earlier build. Each has its own empty-container guard.
             await SeedPromotionsAsync(context);
+
+            // Seed sample reviews independently so existing databases also gain social proof on the
+            // next startup. Seeded reviews are demo data and intentionally bypass the purchase gate.
+            await SeedReviewsAsync(context);
         }
 
         private static async Task SeedPromotionsAsync(MusicStoreEntities context)
@@ -84,9 +100,86 @@ namespace MvcMusicStore.Models
                 }
             }
 
-            context.GiftCards.Add(BuildDemoGiftCard());
-
             await context.SaveChangesAsync();
+        }
+
+        private static async Task SeedReviewsAsync(MusicStoreEntities context)
+        {
+            var reviewsExist = (await context.Reviews.Select(r => r.ReviewId).Take(1).ToListAsync()).Count != 0;
+            if (reviewsExist)
+            {
+                return;
+            }
+
+            var albums = await context.Albums.ToListAsync();
+            if (albums.Count == 0)
+            {
+                return;
+            }
+
+            var random = new Random(2024);
+            string[] reviewers =
+            {
+                "ava.harmon", "liam.beats", "noah.vinyl", "mia.tracks", "ethan.audio",
+                "sofia.notes", "lucas.reverb", "emma.encore", "oliver.tempo", "isla.melody"
+            };
+            string[] snippets =
+            {
+                "On constant repeat since I bought it. Worth every penny.",
+                "Production is crisp and the low end hits hard on good headphones.",
+                "A grower - the back half of the record is the best part.",
+                "Solid front to back, though a couple of tracks drag.",
+                "Exactly the vibe I was after. Highly recommend.",
+                "Great musicianship, but the mastering feels a little loud.",
+                "Nostalgic and fresh at the same time. Love it.",
+                "Not my favorite from this artist, but still enjoyable.",
+                "The kind of album you put on and let run all the way through.",
+                "Fantastic songwriting and the chorus hooks are unreal."
+            };
+
+            var reviews = new List<Review>();
+            var reviewId = 1;
+
+            foreach (var album in albums.OrderBy(a => a.AlbumId))
+            {
+                // Leave roughly a third of the catalog without reviews so "no ratings yet" states
+                // and the rating sort remain meaningful.
+                if (random.NextDouble() < 0.3)
+                {
+                    continue;
+                }
+
+                var reviewCount = random.Next(1, 5);
+                var pickedReviewers = reviewers
+                    .OrderBy(_ => random.Next())
+                    .Take(reviewCount)
+                    .ToList();
+
+                foreach (var reviewer in pickedReviewers)
+                {
+                    // Skew positive (3-5 stars) so averages look like a healthy storefront.
+                    var rating = random.Next(3, 6);
+                    var includeBody = random.NextDouble() < 0.8;
+                    var created = DateTime.UtcNow.AddDays(-random.Next(1, 240));
+
+                    reviews.Add(new Review
+                    {
+                        ReviewId = reviewId++,
+                        AlbumId = album.AlbumId,
+                        AlbumTitle = album.Title,
+                        Username = reviewer,
+                        Rating = rating,
+                        Body = includeBody ? snippets[random.Next(snippets.Length)] : null,
+                        CreatedDate = created
+                    });
+                }
+            }
+
+            if (reviews.Count > 0)
+            {
+                context.Reviews.AddRange(reviews);
+                await context.SaveChangesAsync();
+            }
         }
 
         private static GiftCard BuildDemoGiftCard()
@@ -153,6 +246,166 @@ namespace MvcMusicStore.Models
                 album.ReleaseDate = startDate.AddDays(random.Next(0, maxDays));
                 album.IsAvailable = random.NextDouble() >= 0.15;
             }
+        }
+
+        private static List<Bundle> BuildSampleBundles(List<Album> albums)
+        {
+            var bundles = new List<Bundle>();
+            var created = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            var bundleId = 1;
+
+            var genreGroups = albums
+                .Where(album => !string.IsNullOrWhiteSpace(album.GenreName))
+                .GroupBy(album => album.GenreName!)
+                .OrderBy(group => group.Key)
+                .Take(4);
+
+            foreach (var group in genreGroups)
+            {
+                var picks = group.OrderBy(album => album.AlbumId).Take(3).ToList();
+                if (picks.Count < 2)
+                {
+                    continue;
+                }
+
+                bundles.Add(CreateBundle(
+                    ref bundleId,
+                    created,
+                    $"{group.Key} Essentials",
+                    $"Must-have {group.Key} albums together in one discounted bundle.",
+                    picks,
+                    0.82m));
+            }
+
+            var discover = albums
+                .OrderByDescending(album => album.IsFeatured)
+                .ThenBy(album => album.AlbumId)
+                .Take(3)
+                .ToList();
+
+            if (discover.Count >= 2)
+            {
+                bundles.Add(CreateBundle(
+                    ref bundleId,
+                    created,
+                    "Staff Picks Sampler",
+                    "A hand-picked sampler across genres at a bundle price.",
+                    discover,
+                    0.80m));
+            }
+
+            return bundles;
+        }
+
+        private static Bundle CreateBundle(ref int bundleId, DateTime created, string title, string description, List<Album> picks, decimal discountFactor)
+        {
+            var regularPrice = picks.Sum(album => album.Price);
+            var bundlePrice = Math.Round(regularPrice * discountFactor, 2, MidpointRounding.AwayFromZero);
+
+            return new Bundle
+            {
+                BundleId = bundleId++,
+                Title = title,
+                Description = description,
+                BundlePrice = bundlePrice,
+                IsActive = true,
+                DateCreated = created,
+                Items = picks.Select(album => new BundleItem
+                {
+                    AlbumId = album.AlbumId,
+                    AlbumTitle = album.Title,
+                    AlbumPrice = album.Price,
+                    AlbumArtUrl = album.GetDisplayThumbnailUrl()
+                }).ToList()
+            };
+        }
+
+        private static List<Order> BuildSampleOrders(List<Album> albums, List<Bundle> bundles)
+        {
+            var byId = albums.ToDictionary(album => album.AlbumId);
+            var orders = new List<Order>();
+            var orderId = 1;
+            var orderDate = new DateTime(2024, 2, 1, 10, 0, 0, DateTimeKind.Utc);
+
+            // Reinforce each bundle's members as a frequent co-purchase set.
+            foreach (var bundle in bundles)
+            {
+                var memberIds = bundle.Items.Select(item => item.AlbumId).ToList();
+                for (var i = 0; i < 3; i++)
+                {
+                    orders.Add(BuildOrder(orderId++, orderDate, byId, memberIds));
+                    orderDate = orderDate.AddDays(1);
+                }
+            }
+
+            // Add genre-based co-purchase pairs so single-album recommendations have signal too.
+            var genreGroups = albums
+                .Where(album => !string.IsNullOrWhiteSpace(album.GenreName))
+                .GroupBy(album => album.GenreName!)
+                .OrderBy(group => group.Key)
+                .Take(6);
+
+            foreach (var group in genreGroups)
+            {
+                var picks = group.OrderBy(album => album.AlbumId).Take(4).Select(album => album.AlbumId).ToList();
+                if (picks.Count >= 2)
+                {
+                    orders.Add(BuildOrder(orderId++, orderDate, byId, picks.Take(2)));
+                    orderDate = orderDate.AddDays(1);
+                }
+
+                if (picks.Count >= 3)
+                {
+                    orders.Add(BuildOrder(orderId++, orderDate, byId, picks.Skip(1).Take(2)));
+                    orderDate = orderDate.AddDays(1);
+                }
+            }
+
+            return orders;
+        }
+
+        private static Order BuildOrder(int orderId, DateTime orderDate, IReadOnlyDictionary<int, Album> byId, IEnumerable<int> albumIds)
+        {
+            var details = new List<OrderDetail>();
+            var detailId = 1;
+            decimal total = 0;
+
+            foreach (var albumId in albumIds.Distinct())
+            {
+                if (!byId.TryGetValue(albumId, out var album))
+                {
+                    continue;
+                }
+
+                details.Add(new OrderDetail
+                {
+                    OrderDetailId = detailId++,
+                    OrderId = orderId,
+                    AlbumId = albumId,
+                    Quantity = 1,
+                    UnitPrice = album.Price
+                });
+
+                total += album.Price;
+            }
+
+            return new Order
+            {
+                OrderId = orderId,
+                OrderDate = orderDate,
+                Username = "sample@musicstore.local",
+                FirstName = "Sample",
+                LastName = "Listener",
+                Address = "1 Microsoft Way",
+                City = "Redmond",
+                State = "WA",
+                PostalCode = "98052",
+                Country = "USA",
+                Phone = "555-0100",
+                Email = "sample@musicstore.local",
+                Total = total,
+                OrderDetails = details
+            };
         }
 
         private static List<Album> BuildAlbums(string imgUrl, List<Genre> genres, List<Artist> artists)

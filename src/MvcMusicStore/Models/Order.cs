@@ -98,7 +98,19 @@ namespace MvcMusicStore.Models
         public bool IsGift { get; set; }
 
         [ScaffoldColumn(false)]
-        public string Status { get; set; } = "Paid";
+        public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
+
+        [ScaffoldColumn(false)]
+        public string? PaymentProvider { get; set; }
+
+        [ScaffoldColumn(false)]
+        public string? PaymentReference { get; set; }
+
+        [ScaffoldColumn(false)]
+        public string? PaymentIntentId { get; set; }
+
+        [ScaffoldColumn(false)]
+        public DateTime? PaidDate { get; set; }
 
         public List<OrderDetail>? OrderDetails { get; set; }
     }

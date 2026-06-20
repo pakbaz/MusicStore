@@ -893,6 +893,26 @@ select.form-control option {
     color: var(--text);
 }
 
+/* Keep disabled / readonly controls readable in dark mode. Bootstrap forces a
+   light (#eeeeee) background on these via a higher-specificity selector, which
+   leaves light theme text unreadable (e.g. the AI Music form while generating). */
+.form-control[disabled],
+.form-control[readonly],
+fieldset[disabled] .form-control {
+    background: var(--bg-2);
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+    opacity: 0.9;
+}
+
+.form-control[disabled]::placeholder,
+.form-control[readonly]::placeholder {
+    color: var(--text-faint);
+    -webkit-text-fill-color: var(--text-faint);
+}
+
 /* --------------------------------------------------------------------------
    Tables (admin / cart)
    -------------------------------------------------------------------------- */
@@ -920,15 +940,31 @@ select.form-control option {
     vertical-align: middle;
 }
 
-.table-striped > tbody > tr:nth-of-type(odd) {
+/* Bootstrap stripes/hover/borders target the cells (> td, > th) with light
+   colours at a higher specificity than a row-level override, so match it at the
+   cell level to keep rows readable in dark mode (e.g. the shopping cart). */
+.table-striped > tbody > tr:nth-of-type(odd) > td,
+.table-striped > tbody > tr:nth-of-type(odd) > th {
     background-color: rgba(255, 255, 255, 0.03);
 }
 
-.table-hover > tbody > tr:hover {
+.table-hover > tbody > tr:hover > td,
+.table-hover > tbody > tr:hover > th {
     background-color: var(--accent-soft);
 }
 
-[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) {
+.table-bordered,
+.table-bordered > thead > tr > th,
+.table-bordered > thead > tr > td,
+.table-bordered > tbody > tr > th,
+.table-bordered > tbody > tr > td,
+.table-bordered > tfoot > tr > th,
+.table-bordered > tfoot > tr > td {
+    border-color: var(--border);
+}
+
+[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > td,
+[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) > th {
     background-color: rgba(17, 16, 24, 0.03);
 }
 
@@ -1444,6 +1480,573 @@ input[type="checkbox"].input-validation-error {
 }
 
 .admin-heading p { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --------------------------------------------------------------------------
+   Wishlist / Save for later
+   -------------------------------------------------------------------------- */
+
+.wishlist-save-form {
+    margin: 0;
+    display: inline-flex;
+}
+
+.btn-wishlist {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.btn-wishlist .glyphicon {
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: color 0.18s ease;
+}
+
+.btn-wishlist:hover,
+.btn-wishlist:focus {
+    background: var(--nav-hover-bg);
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+.btn-wishlist:hover .glyphicon,
+.btn-wishlist:focus .glyphicon {
+    color: var(--danger);
+}
+
+.btn-wishlist.is-saved {
+    background: rgba(255, 107, 107, 0.12);
+    border-color: rgba(255, 107, 107, 0.4);
+    color: #ffb3b3;
+}
+
+.btn-wishlist.is-saved .glyphicon {
+    color: var(--danger);
+}
+
+/* Save button anchored under each album card / catalog list item */
+.album-card-actions {
+    padding: 0 15px 15px;
+}
+
+.catalog-item-actions {
+    padding: 12px 15px 0;
+}
+
+.album-card-actions .wishlist-save-form,
+.album-card-actions .btn-wishlist,
+.catalog-item-actions .wishlist-save-form,
+.catalog-item-actions .btn-wishlist {
+    width: 100%;
+}
+
+.album-card-actions .btn-wishlist,
+.catalog-item-actions .btn-wishlist {
+    justify-content: center;
+}
+
+/* Wishlist nav badge heart */
+.wishlist-nav-item .glyphicon-heart {
+    color: var(--danger);
+}
+
+/* Wishlist page */
+.wishlist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+}
+
+.wishlist-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.wishlist-row:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+.wishlist-row-art {
+    flex: 0 0 auto;
+    display: block;
+}
+
+.wishlist-row-art img {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+    display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Bundles & cross-sell (issue #30)
+   -------------------------------------------------------------------------- */
+
+.bundle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.bundle-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.bundle-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--border-strong);
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.5);
+}
+
+.bundle-card-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.bundle-card-link:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+.bundle-card-art {
+    position: relative;
+}
+
+.bundle-card-art img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    background: var(--bg-2);
+    display: block;
+}
+
+.wishlist-row-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wishlist-row-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.wishlist-row-title a {
+    color: var(--text);
+}
+
+.wishlist-row-price {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.wishlist-row-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (max-width: 560px) {
+    .wishlist-row {
+        flex-wrap: wrap;
+    }
+
+    .wishlist-row-actions {
+        width: 100%;
+    }
+}
+
+.bundle-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.bundle-card-body {
+    padding: 14px 15px 16px;
+    flex: 1 1 auto;
+}
+
+.bundle-title {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.3;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.bundle-meta {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.bundle-pricing {
+    margin: 10px 0 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bundle-price {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.bundle-regular {
+    color: var(--text-faint);
+    text-decoration: line-through;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.bundle-save-note {
+    color: var(--success);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.bundle-card-actions {
+    padding: 0 15px 16px;
+}
+
+.album-card-actions {
+    padding: 0 15px 16px;
+}
+
+.bundle-detail .album-detail-art {
+    position: relative;
+}
+
+.bundle-detail .detail-price {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cart-bundle-badge {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border-radius: var(--radius-pill);
+    vertical-align: middle;
+}
+
+.cart-bundle-items {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.cart-suggestions {
+    margin-top: 36px;
+}
+
+.bundle-album-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--panel-2);
+}
+
+.bundle-album-option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.bundle-album-option:hover {
+    background: var(--nav-hover-bg);
+}
+
+.bundle-album-option input {
+    margin: 0;
+}
+
+.bundle-album-title {
+    font-weight: 600;
+}
+
+.bundle-album-meta {
+    grid-column: 2;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   Ratings & reviews (social proof)
+   -------------------------------------------------------------------------- */
+.star-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    white-space: nowrap;
+}
+.star-rating-stars {
+    display: inline-flex;
+    gap: 2px;
+    color: var(--accent);
+}
+.star-rating-stars .glyphicon {
+    font-size: 13px;
+    top: 1px;
+}
+.star-rating-empty .star-rating-stars {
+    color: var(--text-faint);
+}
+.star-rating-value {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+}
+.star-rating-count,
+.star-rating-none {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.album-card-rating {
+    margin: 4px 0;
+}
+
+.detail-rating {
+    margin: 4px 0 12px;
+}
+.detail-rating-link {
+    text-decoration: none;
+    display: inline-flex;
+}
+.detail-rating-link:hover .star-rating-value {
+    color: var(--link-hover);
+}
+.detail-rating-link .star-rating-stars {
+    font-size: 16px;
+}
+.detail-rating-link .star-rating-stars .glyphicon {
+    font-size: 16px;
+}
+
+.reviews-section {
+    scroll-margin-top: 90px;
+}
+.reviews-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.reviews-summary .star-rating-stars {
+    font-size: 18px;
+}
+.reviews-summary .star-rating-stars .glyphicon {
+    font-size: 18px;
+}
+.reviews-summary-meta {
+    color: var(--text-muted);
+}
+
+.review-form-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-card);
+}
+.review-form-card h3 {
+    margin-top: 0;
+}
+.review-form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+/* Accessible pure-CSS star input: radios are rendered 5..1 and reversed so
+   hovering or selecting a star also fills every lower star. */
+.star-input {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    gap: 4px;
+}
+.star-input input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+.star-input label {
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 26px;
+    margin: 0;
+    transition: color 0.12s ease;
+}
+.star-input label .glyphicon {
+    top: 0;
+}
+.star-input label:hover,
+.star-input label:hover ~ label,
+.star-input input[type="radio"]:checked ~ label {
+    color: var(--accent);
+}
+.star-input input[type="radio"]:focus + label {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.review-gate {
+    margin-bottom: 24px;
+}
+
+.review-list {
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+}
+.review-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+}
+.review-card-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.review-author {
+    font-weight: 600;
+    color: var(--text);
+}
+.review-date,
+.review-edited {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.review-body {
+    margin: 0;
+    color: var(--text);
+    white-space: pre-wrap;
+}
+.review-report-form {
+    margin: 8px 0 0;
+}
+.review-report-btn {
+    padding: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.review-report-btn:hover:not([disabled]) {
+    color: var(--danger);
+}
+.review-report-btn[disabled] {
+    color: var(--text-faint);
+    cursor: default;
+    text-decoration: none;
+}
+
+.review-pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+}
+.review-pagination-status {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Admin moderation */
+.review-moderation-filters {
+    margin-bottom: 16px;
+}
+.review-moderation-table .review-moderation-body {
+    max-width: 360px;
+}
+.review-report-reason {
+    display: block;
+    font-size: 12px;
+    margin-top: 4px;
+}
+.review-row-reported > td {
+    background: var(--accent-soft);
+}
+.review-moderation-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.review-moderation-form {
+    margin: 0;
+}
+
 /* Social share buttons (album details) */
 .share-bar {
     display: flex;

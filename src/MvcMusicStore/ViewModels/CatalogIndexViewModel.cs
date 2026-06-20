@@ -6,6 +6,7 @@ namespace MvcMusicStore.ViewModels
     public static class CatalogSortOptions
     {
         public const string PopularityDesc = "popularity_desc";
+        public const string RatingDesc = "rating_desc";
         public const string ReleaseDateDesc = "release_desc";
         public const string ReleaseDateAsc = "release_asc";
         public const string PriceAsc = "price_asc";
@@ -15,6 +16,7 @@ namespace MvcMusicStore.ViewModels
         {
             return sort switch
             {
+                RatingDesc => RatingDesc,
                 ReleaseDateDesc => ReleaseDateDesc,
                 ReleaseDateAsc => ReleaseDateAsc,
                 PriceAsc => PriceAsc,
@@ -56,6 +58,8 @@ namespace MvcMusicStore.ViewModels
         public int Popularity { get; set; }
 
         public bool IsOnSale => EffectivePrice < Price;
+        public double AverageRating { get; set; }
+        public int ReviewCount { get; set; }
         public string? PreviewUrl { get; set; }
         public int PreviewDurationSeconds { get; set; }
         public bool HasPreview => !string.IsNullOrWhiteSpace(PreviewUrl);

@@ -28,4 +28,7 @@
             </p>
         </div>
     </a>
+    <div class="album-card-actions">
+        @await Component.InvokeAsync("WishlistButton", new { albumId = Model.AlbumId })
+    </div>
 </article>

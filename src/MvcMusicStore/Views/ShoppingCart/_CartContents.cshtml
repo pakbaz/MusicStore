@@ -1,0 +1,197 @@
+@model MvcMusicStore.ViewModels.ShoppingCartViewModel
+@{
+    var items = Model.CartItems ?? new List<MvcMusicStore.Models.Cart>();
+    var hasItems = items.Count > 0;
+    var summary = hasItems
+        ? string.Join("\n", items.Select(i => $"{i.DisplayTitle} x{i.Count}"))
+        : "Your cart is empty";
+    var pricing = Model.Pricing;
+    var lineByRecord = pricing?.Lines.ToDictionary(l => l.RecordId)
+        ?? new Dictionary<int, MvcMusicStore.Services.CartLine>();
+    // Bundle cards inside the cart use one-click AJAX add instead of a redirect link.
+    ViewData["AjaxAdd"] = true;
+}
+
+<div id="cart-data"
+     data-cart-count="@Model.CartCount"
+     data-cart-summary="@summary"
+     data-cart-message="@Model.Message"></div>
+
+@if (!hasItems)
+{
+    <div class="jumbotron">
+        <h2>Your cart is empty</h2>
+        <p>Add music you love, then come back to checkout.</p>
+        <p>
+            <a class="btn btn-primary btn-lg" href="@Url.Action("Index", "Store")">Browse music</a>
+        </p>
+    </div>
+}
+else
+{
+    <p>
+        <a class="btn btn-primary" href="@Url.Action("AddressAndPayment", "Checkout")" aria-label="Proceed to checkout">Proceed to checkout</a>
+        <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
+    </p>
+
+    <table id="cart-summary-table" class="table table-striped table-bordered">
+        <caption class="sr-only">Items in your shopping cart</caption>
+        <thead>
+            <tr>
+                <th scope="col">Item</th>
+                <th scope="col" class="text-right">Unit price</th>
+                <th scope="col">Quantity</th>
+                <th scope="col" class="text-right">Subtotal</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in items)
+            {
+                <tr id="row-@item.RecordId" class="cart-row">
+                    <td>
+                        @if (item.IsBundle)
+                        {
+                            <span class="cart-bundle-badge">Bundle</span>
+                            @Html.ActionLink(item.DisplayTitle, "Details", "Bundles", new { id = item.BundleId }, new { @class = "cart-item-title" })
+                            <ul class="cart-bundle-items">
+                                @foreach (var member in item.BundleItems ?? new List<MvcMusicStore.Models.CartBundleItem>())
+                                {
+                                    <li>@member.AlbumTitle</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <a href="@Url.AlbumUrl(item.AlbumId, item.DisplayTitle)">@item.DisplayTitle</a>
+                            @if (lineByRecord.TryGetValue(item.RecordId, out var badgeLine) && badgeLine.IsOnSale)
+                            {
+                                <span class="sale-badge" title="@badgeLine.SaleName">Sale</span>
+                            }
+                        }
+                    </td>
+                    <td class="text-right">
+                        @if (lineByRecord.TryGetValue(item.RecordId, out var priceLine) && priceLine.IsOnSale)
+                        {
+                            <span class="price-was">@priceLine.UnitPrice.ToString("C")</span>
+                            <span class="price-now">@priceLine.EffectiveUnitPrice.ToString("C")</span>
+                        }
+                        else
+                        {
+                            @item.LineUnitPrice.ToString("C")
+                        }
+                    </td>
+                    <td>
+                        <div class="input-group cart-quantity-group">
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="-1" aria-label="Decrease quantity for @item.DisplayTitle">-</button>
+                            </span>
+                            <input id="quantity-input-@item.RecordId" class="form-control cart-quantity-input" type="number" min="0" value="@item.Count" aria-label="Quantity for @item.DisplayTitle" />
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-default js-step" data-id="@item.RecordId" data-delta="1" aria-label="Increase quantity for @item.DisplayTitle">+</button>
+                            </span>
+                        </div>
+                    </td>
+                    <td id="item-subtotal-@item.RecordId" class="text-right">@((lineByRecord.TryGetValue(item.RecordId, out var subtotalLine) ? subtotalLine.LineSubtotal : item.LineSubtotal).ToString("C"))</td>
+                    <td>
+                        <button type="button" class="btn btn-default js-update" data-id="@item.RecordId" aria-label="Update quantity for @item.DisplayTitle">Update</button>
+                        <button type="button" class="btn btn-link js-remove" data-id="@item.RecordId" aria-label="Remove @item.DisplayTitle from cart">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            @if (pricing != null)
+            {
+                <tr>
+                    <th colspan="3" class="text-right">Subtotal</th>
+                    <th id="cart-subtotal" class="text-right">@pricing.Subtotal.ToString("C")</th>
+                    <th></th>
+                </tr>
+                <tr id="cart-discount-row" class="@(pricing.DiscountApplied ? string.Empty : "hidden")">
+                    <th colspan="3" class="text-right">
+                        Discount (<span id="cart-discount-code">@pricing.AppliedCode</span>)
+                    </th>
+                    <th id="cart-discount-amount" class="text-right text-success">-@pricing.DiscountAmount.ToString("C")</th>
+                    <th></th>
+                </tr>
+            }
+            <tr>
+                <th colspan="3" class="text-right">Total</th>
+                <th id="cart-total" class="text-right">@((pricing?.Total ?? Model.CartTotal).ToString("C"))</th>
+                <th></th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="discount-panel">
+        @if (pricing != null && pricing.DiscountApplied)
+        {
+            <div class="discount-applied">
+                <span class="label label-success">Code @pricing.AppliedCode applied</span>
+                <span class="discount-applied-text">You're saving @pricing.DiscountAmount.ToString("C").</span>
+                @using (Html.BeginForm("RemoveDiscount", "ShoppingCart", FormMethod.Post, new { @class = "form-inline discount-remove-form" }))
+                {
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-link">Remove</button>
+                }
+            </div>
+        }
+        else
+        {
+            @using (Html.BeginForm("ApplyDiscount", "ShoppingCart", FormMethod.Post, new { @class = "form-inline discount-form", aria_label = "Apply a discount code" }))
+            {
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label class="control-label" for="code">Discount code</label>
+                    <input type="text" id="code" name="code" class="form-control" placeholder="e.g. SAVE20" autocomplete="off" />
+                </div>
+                <button type="submit" class="btn btn-default">Apply code</button>
+            }
+        }
+    </div>
+
+    @if (Model.SuggestedBundles.Count > 0)
+    {
+        <section class="content-section cart-suggestions">
+            <div class="section-heading">
+                <h2>Frequently bought together</h2>
+                <p class="section-subtitle">Grab a bundle and save versus buying separately.</p>
+            </div>
+            <div class="bundle-grid">
+                @foreach (var bundle in Model.SuggestedBundles)
+                {
+                    <partial name="_BundleCard" model="bundle" />
+                }
+            </div>
+        </section>
+    }
+
+    @if (Model.Recommendations.Count > 0)
+    {
+        <section class="content-section cart-suggestions">
+            <div class="section-heading">
+                <h2>Customers also bought</h2>
+            </div>
+            <div class="album-grid">
+                @foreach (var album in Model.Recommendations)
+                {
+                    <article class="album-card">
+                        <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                            <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                            <div class="album-card-body">
+                                <h3 class="album-title">@album.Title</h3>
+                                <p class="album-price">@album.Price.ToString("C")</p>
+                            </div>
+                        </a>
+                        <div class="album-card-actions">
+                            <button type="button" class="btn btn-default btn-block js-add-item" data-id="@album.AlbumId" aria-label="Add @album.Title to cart">
+                                <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span> Add to cart
+                            </button>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}

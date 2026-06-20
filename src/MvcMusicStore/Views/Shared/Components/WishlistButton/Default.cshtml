@@ -1,0 +1,13 @@
+@model MvcMusicStore.ViewModels.WishlistButtonViewModel
+
+<form asp-controller="Wishlist" asp-action="ToggleSave" method="post" class="wishlist-save-form">
+    <input type="hidden" name="albumId" value="@Model.AlbumId" />
+    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+    <button type="submit"
+            class="btn btn-wishlist@(Model.Large ? " btn-lg" : string.Empty)@(Model.IsSaved ? " is-saved" : string.Empty)"
+            aria-pressed="@(Model.IsSaved ? "true" : "false")"
+            title="@(Model.IsSaved ? "Remove from wishlist" : "Save for later")">
+        <span class="glyphicon @(Model.IsSaved ? "glyphicon-heart" : "glyphicon-heart-empty")" aria-hidden="true"></span>
+        <span class="btn-wishlist-label">@(Model.IsSaved ? "Saved" : "Save for later")</span>
+    </button>
+</form>

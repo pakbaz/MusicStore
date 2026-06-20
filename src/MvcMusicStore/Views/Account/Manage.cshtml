@@ -28,6 +28,13 @@
         <section id="externalLogins">
             @await Html.PartialAsync("_ExternalLoginsListPartial", new { Action = "LinkLogin", ReturnUrl = ViewBag.ReturnUrl })
         </section>
+
+        <hr />
+        <section id="emailPreferences">
+            <h4>Email preferences</h4>
+            <p>Manage order receipts, cart reminders, and newsletter subscriptions.</p>
+            <a class="btn btn-default" href="@Url.Action("EmailPreferences", "Account")">Manage email preferences</a>
+        </section>
     </div>
 </div>
 @section Scripts {

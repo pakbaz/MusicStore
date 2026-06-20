@@ -1,0 +1,61 @@
+@model MvcMusicStore.Models.Bundle
+@{
+    ViewBag.Title = "Bundle - " + Model.Title;
+}
+
+<article class="album-detail bundle-detail">
+    <div class="album-detail-art">
+        <img alt="@Model.Title" src="@Url.Content(Model.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+        @if (Model.Savings > 0)
+        {
+            <span class="bundle-badge">Save @Model.Savings.ToString("C")</span>
+        }
+    </div>
+    <div class="album-detail-content">
+        <p class="detail-kicker">Bundle · @Model.AlbumCount albums</p>
+        <h1>@Model.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p class="detail-artist">@Model.Description</p>
+        }
+        <p class="detail-price bundle-pricing">
+            <span class="bundle-price">@Model.BundlePrice.ToString("C")</span>
+            @if (Model.Savings > 0)
+            {
+                <span class="bundle-regular">@Model.RegularPrice.ToString("C")</span>
+                <span class="bundle-save-note">You save @Model.Savings.ToString("C") (@Model.SavingsPercent%)</span>
+            }
+        </p>
+        <div class="detail-actions">
+            <a class="btn btn-primary btn-lg"
+               href="@Url.Action("AddBundleToCart", "ShoppingCart", new { id = Model.BundleId })"
+               aria-label="Add @Model.Title bundle to cart">
+                <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
+                Add bundle to cart
+            </a>
+            <a class="btn btn-default btn-lg" href="@Url.Action("Index", "Bundles")">
+                Back to deals
+            </a>
+        </div>
+    </div>
+</article>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h2>What's in this bundle</h2>
+    </div>
+    <div class="album-grid">
+        @foreach (var item in Model.Items)
+        {
+            <article class="album-card">
+                <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = item.AlbumId })">
+                    <img alt="@item.AlbumTitle" src="@Url.Content(MvcMusicStore.Models.Album.NormalizeThumbnailUrl(item.AlbumArtUrl))" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                    <div class="album-card-body">
+                        <h3 class="album-title">@item.AlbumTitle</h3>
+                        <p class="album-price">@item.AlbumPrice.ToString("C")</p>
+                    </div>
+                </a>
+            </article>
+        }
+    </div>
+</section>

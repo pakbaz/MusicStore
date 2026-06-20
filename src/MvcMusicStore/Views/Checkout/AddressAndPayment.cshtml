@@ -136,12 +136,28 @@
     <fieldset class="form-horizontal">
         <legend>Payment</legend>
 
+        @if (ViewBag.PaymentConfigured == true)
+        {
+            <p>
+                Pay securely by card — when you submit, you'll be redirected to our payment provider
+                (Stripe) to complete your purchase. No card details are stored by this site.
+            </p>
+            <p class="text-muted">
+                Have a gift card? Apply it below — it pays down your order total, and anything still
+                owing is paid by card.
+            </p>
+        }
+        else
+        {
+            <p>You can pay with a gift card. Apply your gift card code below.</p>
+        }
+
         <div class="form-group">
             @Html.Label("GiftCardCode", "Gift Card Code", new { @class = "control-label col-md-2" })
             <div class="col-md-6">
                 @Html.TextBox("GiftCardCode", ViewBag.GiftCardCode as string, new { @class = "form-control", placeholder = "GIFT-XXXX-XXXX-XXXX (optional)", autocomplete = "off" })
                 @Html.ValidationMessage("GiftCardCode", string.Empty, new { @class = "text-danger" })
-                <p class="help-block">A gift card pays down your order total before checkout.</p>
+                <p class="help-block">A gift card pays down your order total.@(ViewBag.PaymentConfigured == true ? " Any remaining balance is paid by card." : "")</p>
             </div>
         </div>
     </fieldset>
@@ -192,7 +208,7 @@
     </fieldset>
 
     <p>
-        <input class="btn btn-primary" type="submit" value="Submit Order" />
+        <input class="btn btn-primary" type="submit" value="@(ViewBag.PaymentConfigured == true ? "Continue to payment" : "Submit Order")" />
         <a class="btn btn-default" href="@Url.Action("Index", "ShoppingCart")">Back to cart</a>
     </p>
 }

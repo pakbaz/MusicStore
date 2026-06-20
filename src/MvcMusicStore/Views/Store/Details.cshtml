@@ -41,6 +41,11 @@
         <p class="detail-artist">
             by <a href="@Url.ArtistUrl(detailAlbum.ArtistId, artistName)">@artistName</a>
         </p>
+        <p class="detail-rating">
+            <a class="detail-rating-link" href="#reviews">
+                @await Html.PartialAsync("_StarRating", Model.Reviews.Summary)
+            </a>
+        </p>
         @{
             var detailPricing = Model.Pricing ?? MvcMusicStore.Services.AlbumPricing.NoSale(Model.Album.AlbumId, Model.Album.Price);
         }
@@ -80,6 +85,7 @@
                 <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
                 Add to cart
             </a>
+            @await Component.InvokeAsync("WishlistButton", new { albumId = Model.Album.AlbumId, large = true })
             <a class="btn btn-default btn-lg"
                href="@Url.Action("Send", "Gift", new { id = Model.Album.AlbumId })"
                aria-label="Send @Model.Album.Title as a gift">
@@ -105,6 +111,174 @@
         </div>
     </div>
 </article>
+
+@if (Model.Bundles.Count > 0)
+{
+    <div class="content-section">
+        <div class="section-heading">
+            <h2>Complete the set</h2>
+            <p class="section-subtitle">Bundle @Model.Album.Title with more music and save.</p>
+        </div>
+        <div class="bundle-grid">
+            @foreach (var bundle in Model.Bundles)
+            {
+                <partial name="_BundleCard" model="bundle" />
+            }
+        </div>
+    </div>
+}
+
+@if (Model.AlsoBought.Count > 0)
+{
+    <div class="content-section">
+        <div class="section-heading">
+            <h2>Customers also bought</h2>
+        </div>
+        <div class="album-grid">
+            @foreach (var album in Model.AlsoBought)
+            {
+                <article class="album-card">
+                    <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                        <div class="album-card-body">
+                            <h3 class="album-title">@album.Title</h3>
+                            <p class="album-price">@album.Artist?.Name</p>
+                        </div>
+                    </a>
+                    <div class="album-card-actions">
+                        <a class="btn btn-default btn-block" href="@Url.Action("AddToCart", "ShoppingCart", new { id = album.AlbumId })" aria-label="Add @album.Title to cart">
+                            <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span> Add to cart
+                        </a>
+                    </div>
+                </article>
+            }
+        </div>
+    </div>
+}
+
+@{
+    var reviews = Model.Reviews;
+}
+<section class="content-section reviews-section" id="reviews" aria-label="Ratings and reviews">
+    <div class="section-heading">
+        <h2>Ratings &amp; reviews</h2>
+    </div>
+
+    <div class="reviews-summary">
+        @await Html.PartialAsync("_StarRating", reviews.Summary)
+        @if (reviews.HasReviews)
+        {
+            <span class="reviews-summary-meta">Based on @reviews.Summary.Count @(reviews.Summary.Count == 1 ? "review" : "reviews")</span>
+        }
+    </div>
+
+    @if (TempData["ReviewMessage"] != null)
+    {
+        <div class="alert alert-success" role="status">@TempData["ReviewMessage"]</div>
+    }
+    @if (TempData["ReviewError"] != null)
+    {
+        <div class="alert alert-danger" role="alert">@TempData["ReviewError"]</div>
+    }
+
+    @if (reviews.CanReview)
+    {
+        var isEdit = reviews.MyReview != null;
+        <div class="review-form-card">
+            <h3>@(isEdit ? "Edit your review" : "Write a review")</h3>
+            <form asp-controller="Reviews" asp-action="Create" method="post" class="review-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="AlbumId" value="@reviews.AlbumId" />
+                <div class="form-group">
+                    <span class="control-label review-form-label">Your rating</span>
+                    <fieldset class="star-input">
+                        <legend class="sr-only">Select a star rating from 1 to 5</legend>
+                        @for (var value = 5; value >= 1; value--)
+                        {
+                            var inputId = $"rating-{value}";
+                            <input type="radio" name="Rating" id="@inputId" value="@value" checked="@(reviews.Form.Rating == value)" required />
+                            <label for="@inputId" title="@value star@(value == 1 ? "" : "s")">
+                                <span class="glyphicon glyphicon-star" aria-hidden="true"></span>
+                                <span class="sr-only">@value stars</span>
+                            </label>
+                        }
+                    </fieldset>
+                </div>
+                <div class="form-group">
+                    <label class="control-label" for="review-body">Your review <span class="text-muted">(optional)</span></label>
+                    <textarea class="form-control" id="review-body" name="Body" rows="4" maxlength="2000" placeholder="Share what you loved about this album">@reviews.Form.Body</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">@(isEdit ? "Update review" : "Post review")</button>
+            </form>
+        </div>
+    }
+    else if (!reviews.IsAuthenticated)
+    {
+        <div class="review-gate alert alert-info">
+            Please @Html.ActionLink("sign in", "Login", "Account", new { returnUrl = Url.Action("Details", "Store", new { id = Model.Album.AlbumId }) }, null) to review albums you've purchased.
+        </div>
+    }
+    else
+    {
+        <div class="review-gate alert alert-info">
+            Only verified purchasers can review this album. @Html.ActionLink("Add it to your cart", "AddToCart", "ShoppingCart", new { id = Model.Album.AlbumId }, null) to get started.
+        </div>
+    }
+
+    @if (!reviews.HasReviews)
+    {
+        <p class="section-subtitle">No reviews yet. Be the first to share your thoughts.</p>
+    }
+    else
+    {
+        <ol class="review-list list-unstyled">
+            @foreach (var review in reviews.Reviews)
+            {
+                <li class="review-card">
+                    <div class="review-card-head">
+                        @await Html.PartialAsync("_StarRating", new MvcMusicStore.ViewModels.StarRatingViewModel { Average = review.Rating, Count = 0, ShowCount = false })
+                        <span class="review-author">@review.Author</span>
+                        <time class="review-date" datetime="@review.CreatedDate.ToString("yyyy-MM-dd")">@review.CreatedDate.ToString("MMM d, yyyy")</time>
+                        @if (review.WasEdited)
+                        {
+                            <span class="review-edited text-muted">(edited)</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(review.Body))
+                    {
+                        <p class="review-body">@review.Body</p>
+                    }
+                    @if (reviews.IsAuthenticated && (reviews.MyReview == null || reviews.MyReview.ReviewId != review.ReviewId))
+                    {
+                        <form asp-controller="Reviews" asp-action="Report" method="post" class="review-report-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@review.ReviewId" />
+                            <input type="hidden" name="albumId" value="@reviews.AlbumId" />
+                            <button type="submit" class="btn btn-link btn-sm review-report-btn" disabled="@review.IsReported">
+                                @(review.IsReported ? "Reported" : "Report")
+                            </button>
+                        </form>
+                    }
+                </li>
+            }
+        </ol>
+
+        @if (reviews.TotalPages > 1)
+        {
+            <nav class="review-pagination" aria-label="Reviews pages">
+                @if (reviews.Page > 1)
+                {
+                    <a class="btn btn-default btn-sm" href="@(Url.Action("Details", "Store", new { id = Model.Album.AlbumId, reviewsPage = reviews.Page - 1 }))#reviews">Previous</a>
+                }
+                <span class="review-pagination-status">Page @reviews.Page of @reviews.TotalPages</span>
+                @if (reviews.Page < reviews.TotalPages)
+                {
+                    <a class="btn btn-default btn-sm" href="@(Url.Action("Details", "Store", new { id = Model.Album.AlbumId, reviewsPage = reviews.Page + 1 }))#reviews">Next</a>
+                }
+            </nav>
+        }
+    }
+</section>
 
 <section class="content-section">
     <div class="section-heading">

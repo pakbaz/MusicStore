@@ -62,6 +62,88 @@ namespace MvcMusicStore.Models
             }
         }
 
+        public async Task AddBundleToCartAsync(Bundle bundle)
+        {
+            var cartItem = await _db.Carts.SingleOrDefaultAsync(
+                c => c.CartId == ShoppingCartId
+                && c.BundleId == bundle.BundleId);
+
+            if (cartItem == null)
+            {
+                cartItem = new Cart
+                {
+                    RecordId = await _db.NextCartRecordIdAsync(),
+                    CartId = ShoppingCartId,
+                    AlbumId = 0,
+                    Count = 1,
+                    DateCreated = DateTime.Now,
+                    BundleId = bundle.BundleId,
+                    BundleTitle = bundle.Title,
+                    BundlePrice = bundle.BundlePrice,
+                    BundleItems = DistributeBundlePricing(bundle),
+                    AlbumArtUrl = bundle.GetDisplayThumbnailUrl()
+                };
+
+                _db.Carts.Add(cartItem);
+            }
+            else
+            {
+                cartItem.Count++;
+            }
+        }
+
+        // Spreads the bundle's discounted price across its member albums (proportional to each
+        // album's regular price) so the per-album unit prices sum exactly to the bundle price.
+        // Those unit prices are what we record as OrderDetails at checkout.
+        private static List<CartBundleItem> DistributeBundlePricing(Bundle bundle)
+        {
+            var items = bundle.Items ?? new List<BundleItem>();
+            var result = new List<CartBundleItem>();
+            if (items.Count == 0)
+            {
+                return result;
+            }
+
+            var regularTotal = items.Sum(item => item.AlbumPrice);
+            var bundlePrice = bundle.BundlePrice;
+            decimal allocated = 0m;
+
+            for (var index = 0; index < items.Count; index++)
+            {
+                var item = items[index];
+                decimal unitPrice;
+
+                if (index == items.Count - 1)
+                {
+                    // Last member absorbs the rounding remainder so the line sums to BundlePrice.
+                    unitPrice = bundlePrice - allocated;
+                }
+                else if (regularTotal > 0m)
+                {
+                    unitPrice = Math.Round(item.AlbumPrice / regularTotal * bundlePrice, 2, MidpointRounding.AwayFromZero);
+                }
+                else
+                {
+                    unitPrice = Math.Round(bundlePrice / items.Count, 2, MidpointRounding.AwayFromZero);
+                }
+
+                if (unitPrice < 0m)
+                {
+                    unitPrice = 0m;
+                }
+
+                allocated += unitPrice;
+                result.Add(new CartBundleItem
+                {
+                    AlbumId = item.AlbumId,
+                    AlbumTitle = item.AlbumTitle,
+                    UnitPrice = unitPrice
+                });
+            }
+
+            return result;
+        }
+
         public async Task<int> RemoveFromCartAsync(int id)
         {
             // Get the cart
@@ -110,7 +192,14 @@ namespace MvcMusicStore.Models
 
         public async Task EmptyCartAsync()
         {
-            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
+            await EmptyCartForUserAsync(ShoppingCartId);
+        }
+
+        // Empties the cart for a specific cart id (username once logged in). Usable outside an
+        // HTTP request/session context, e.g. from the Stripe webhook handler.
+        public async Task EmptyCartForUserAsync(string cartId)
+        {
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == cartId).ToListAsync();
 
             foreach (var cartItem in cartItems)
             {
@@ -134,7 +223,7 @@ namespace MvcMusicStore.Models
         public async Task<decimal> GetTotalAsync()
         {
             var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
-            return cartItems.Sum(item => item.Count * item.AlbumPrice);
+            return cartItems.Sum(item => item.Count * item.LineUnitPrice);
         }
 
         /// <summary>
@@ -143,13 +232,34 @@ namespace MvcMusicStore.Models
         /// </summary>
         public async Task<int> CreateOrderAsync(Order order, CartPricing pricing)
         {
+            await BuildOrderAsync(order, pricing);
+
+            // Empty the shopping cart
+            await EmptyCartAsync();
+
+            // Return the OrderId as the confirmation number
+            return order.OrderId;
+        }
+
+        // Populates the order's line items and total from the current cart WITHOUT emptying it.
+        // Used by the payment flow so the cart survives a failed/cancelled payment. Bundle lines
+        // are expanded into one order detail per member album at the distributed (discounted) unit
+        // price; non-bundle lines use the sale-adjusted unit price from the supplied pricing.
+        public async Task<int> BuildOrderAsync(Order order, CartPricing pricing)
+        {
+            var cartItems = await GetCartItemsAsync();
             order.OrderDetails ??= new List<OrderDetail>();
 
             // Load the catalog albums backing the cart so each line can capture the album's
             // current title, art, and audio (download) URL as a stable snapshot. Albums are
             // fetched one id at a time, matching the Cosmos-safe query patterns used elsewhere.
             var albumLookup = new Dictionary<int, Album>();
-            foreach (var albumId in pricing.Lines.Select(l => l.AlbumId).Distinct())
+            var albumIds = cartItems
+                .Where(i => !i.IsBundle)
+                .Select(i => i.AlbumId)
+                .Concat(cartItems.SelectMany(i => (i.BundleItems ?? new List<CartBundleItem>()).Select(m => m.AlbumId)))
+                .Distinct();
+            foreach (var albumId in albumIds)
             {
                 var album = await _db.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
                 if (album != null)
@@ -162,18 +272,57 @@ namespace MvcMusicStore.Models
 
             // Persist the sale-adjusted unit price each line was actually charged at, plus a
             // catalog snapshot (title, art, audio) so order history and receipts stay stable.
-            foreach (var line in pricing.Lines)
+            // Bundle members are recorded at their distributed (discounted) unit price; non-bundle
+            // lines are matched to their priced line by cart RecordId for the sale-adjusted price.
+            var effectiveByRecord = pricing.Lines.ToDictionary(l => l.RecordId, l => l.EffectiveUnitPrice);
+
+            foreach (var item in cartItems)
             {
-                albumLookup.TryGetValue(line.AlbumId, out var album);
+                if (item.IsBundle)
+                {
+                    // Expand the bundle into one order detail per member album at the distributed
+                    // (discounted) unit price, so the order total matches the discounted cart line.
+                    foreach (var member in item.BundleItems ?? new List<CartBundleItem>())
+                    {
+                        albumLookup.TryGetValue(member.AlbumId, out var memberAlbum);
+
+                        order.OrderDetails.Add(new OrderDetail
+                        {
+                            OrderDetailId = orderDetailId++,
+                            AlbumId = member.AlbumId,
+                            OrderId = order.OrderId,
+                            UnitPrice = member.UnitPrice,
+                            Quantity = item.Count,
+                            AlbumTitle = memberAlbum?.Title ?? member.AlbumTitle,
+                            AlbumArtUrl = memberAlbum?.GetDisplayThumbnailUrl(),
+                            AudioUrl = memberAlbum?.AudioUrl,
+                        });
+
+                        // Maintain the denormalized popularity counter (Cosmos-safe; reuse tracked album).
+                        if (memberAlbum != null)
+                        {
+                            memberAlbum.Popularity += item.Count;
+                        }
+                    }
+
+                    continue;
+                }
+
+                // Non-bundle line: charge the sale-adjusted unit price computed by the promotion engine.
+                var unitPrice = effectiveByRecord.TryGetValue(item.RecordId, out var effective)
+                    ? effective
+                    : item.AlbumPrice;
+
+                albumLookup.TryGetValue(item.AlbumId, out var album);
 
                 order.OrderDetails.Add(new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
-                    AlbumId = line.AlbumId,
+                    AlbumId = item.AlbumId,
                     OrderId = order.OrderId,
-                    UnitPrice = line.EffectiveUnitPrice,
-                    Quantity = line.Quantity,
-                    AlbumTitle = album?.Title ?? line.Title,
+                    UnitPrice = unitPrice,
+                    Quantity = item.Count,
+                    AlbumTitle = album?.Title ?? item.AlbumTitle,
                     AlbumArtUrl = album?.GetDisplayThumbnailUrl(),
                     AudioUrl = album?.AudioUrl,
                 });
@@ -184,7 +333,7 @@ namespace MvcMusicStore.Models
                 // persisted by the caller's SaveChangesAsync without an extra query.
                 if (album != null)
                 {
-                    album.Popularity += line.Quantity;
+                    album.Popularity += item.Count;
                 }
             }
 
@@ -192,9 +341,6 @@ namespace MvcMusicStore.Models
             order.DiscountCode = pricing.AppliedCode;
             order.DiscountAmount = pricing.DiscountAmount;
             order.Total = pricing.Total;
-
-            // Empty the shopping cart
-            await EmptyCartAsync();
 
             // Return the OrderId as the confirmation number
             return order.OrderId;

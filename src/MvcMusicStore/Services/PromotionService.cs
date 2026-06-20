@@ -169,18 +169,39 @@ namespace MvcMusicStore.Services
 
             foreach (var item in items)
             {
-                var pricing = BestPricing(item.AlbumId, item.AlbumPrice, activeSales);
-                var line = new CartLine
+                CartLine line;
+                if (item.IsBundle)
                 {
-                    RecordId = item.RecordId,
-                    AlbumId = item.AlbumId,
-                    Title = item.AlbumTitle ?? string.Empty,
-                    Quantity = item.Count,
-                    UnitPrice = item.AlbumPrice,
-                    EffectiveUnitPrice = pricing.EffectivePrice,
-                    SaleName = pricing.SaleName,
-                    SaleEndsUtc = pricing.SaleEndsUtc
-                };
+                    // Bundles are already discounted as a curated package, so storewide/album
+                    // sales do not stack on top of the bundle price (the bundle is its own deal).
+                    // A coupon still applies to the overall subtotal below.
+                    line = new CartLine
+                    {
+                        RecordId = item.RecordId,
+                        AlbumId = item.AlbumId,
+                        Title = item.DisplayTitle,
+                        Quantity = item.Count,
+                        UnitPrice = item.BundlePrice,
+                        EffectiveUnitPrice = item.BundlePrice,
+                        SaleName = null,
+                        SaleEndsUtc = null
+                    };
+                }
+                else
+                {
+                    var pricing = BestPricing(item.AlbumId, item.AlbumPrice, activeSales);
+                    line = new CartLine
+                    {
+                        RecordId = item.RecordId,
+                        AlbumId = item.AlbumId,
+                        Title = item.AlbumTitle ?? string.Empty,
+                        Quantity = item.Count,
+                        UnitPrice = item.AlbumPrice,
+                        EffectiveUnitPrice = pricing.EffectivePrice,
+                        SaleName = pricing.SaleName,
+                        SaleEndsUtc = pricing.SaleEndsUtc
+                    };
+                }
 
                 lines.Add(line);
                 subtotal += line.LineSubtotal;

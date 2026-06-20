@@ -1,7 +1,9 @@
 using Azure.Core;
 using Azure.Identity;
+using Azure.Communication.Email;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
@@ -27,6 +29,12 @@ builder.Services.Configure<StorageOptions>(
     builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.Configure<MusicGenOptions>(
     builder.Configuration.GetSection(MusicGenOptions.SectionName));
+
+// Stripe payment provider (Checkout hosted redirect). Secrets (SecretKey, WebhookSecret) come
+// from user-secrets / environment / Key Vault, never appsettings.
+builder.Services.Configure<StripeOptions>(
+    builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddSingleton<IPaymentService, StripePaymentService>();
 
 // Loyalty rewards + referral program.
 builder.Services.Configure<LoyaltyOptions>(
@@ -123,19 +131,56 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
     client.Timeout = TimeSpan.FromSeconds(timeoutSeconds <= 0 ? 600 : timeoutSeconds);
 });
 
-// Order confirmation email. The default sender logs the rendered receipt; swap this
-// registration for an SMTP-backed IOrderEmailSender to deliver real mail.
-builder.Services.Configure<EmailOptions>(
-    builder.Configuration.GetSection(EmailOptions.SectionName));
-builder.Services.AddScoped<IOrderEmailSender, LoggingOrderEmailSender>();
-
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
 // Promotions engine: sale pricing, discount-code validation, and the featured Deal of the Day.
 builder.Services.AddScoped<IPromotionService, PromotionService>();
-// Gift cards and gifting: simulated email delivery + gift-card issuance/redemption.
-builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+
+// Cross-sell / upsell recommendations and admin-defined album bundles.
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+builder.Services.AddScoped<IBundleService, BundleService>();
+
+// Email: transactional receipts + abandoned-cart recovery + opt-in marketing.
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<AbandonedCartOptions>(
+    builder.Configuration.GetSection(AbandonedCartOptions.SectionName));
+
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.UsesAcs)
+{
+    // Azure Communication Services Email. Local/dev may use a connection string; Azure uses the
+    // resource endpoint with the shared managed-identity credential.
+    builder.Services.AddSingleton(sp =>
+    {
+        var options = sp.GetRequiredService<IOptions<EmailOptions>>().Value;
+        if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            return new EmailClient(options.ConnectionString);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Endpoint))
+        {
+            return new EmailClient(new Uri(options.Endpoint), azureCredential);
+        }
+
+        throw new InvalidOperationException(
+            "Email:ConnectionString or Email:Endpoint must be configured when Email:Provider is 'Acs'.");
+    });
+    builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+}
+
+builder.Services.AddSingleton<EmailTemplateService>();
+builder.Services.AddScoped<StoreEmailService>();
+builder.Services.AddHostedService<AbandonedCartReminderWorker>();
+
+// Gift cards and gifting: gift-card issuance/redemption. Email delivery reuses the shared
+// IEmailSender registered above (gift/gift-card flows call SendEmailAsync on it).
 builder.Services.AddScoped<IGiftCardService, GiftCardService>();
 
 var app = builder.Build();
@@ -190,6 +235,12 @@ static async Task SeedDatabaseAsync(WebApplication app)
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
 
+        // EnsureCreatedAsync only provisions containers when the Cosmos database is first
+        // created. When the database already exists, containers added to the model later
+        // (such as the wishlist) are not created, and queries against them fail at runtime
+        // with a 404 "Collection not found". Reconcile any missing containers explicitly.
+        await EnsureModelContainersAsync(musicStoreDb);
+
         // The atomic id-counter container is managed via the Cosmos SDK (not an EF entity), so create
         // it explicitly. Partition key "/id" gives each counter its own logical partition.
         var catalogOptions = services.GetRequiredService<CosmosCatalogOptions>();
@@ -240,6 +291,30 @@ static async Task SeedDatabaseAsync(WebApplication app)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
+static async Task EnsureModelContainersAsync(DbContext db)
+{
+    if (!db.Database.IsCosmos())
+    {
+        return;
+    }
+
+    var cosmosClient = db.Database.GetCosmosClient();
+    var database = cosmosClient.GetDatabase(db.Database.GetCosmosDatabaseId());
+
+    var containerNames = db.Model.GetEntityTypes()
+        .Select(entityType => entityType.GetContainer())
+        .Where(name => !string.IsNullOrEmpty(name))
+        .Distinct(StringComparer.Ordinal);
+
+    foreach (var containerName in containerNames)
+    {
+        // Keyless entities map to a container partitioned on "/__partitionKey", matching
+        // the convention EF Core uses when it provisions the containers itself.
+        var containerProperties = new ContainerProperties(containerName!, new List<string> { "/__partitionKey" });
+        await database.CreateContainerIfNotExistsAsync(containerProperties);
     }
 }
 
