@@ -1,5 +1,6 @@
 using Azure.Core;
 using Azure.Identity;
+using Azure.Communication.Email;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -116,6 +117,44 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
 
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
+
+// Email: transactional receipts + abandoned-cart recovery + opt-in marketing.
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<AbandonedCartOptions>(
+    builder.Configuration.GetSection(AbandonedCartOptions.SectionName));
+
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.UsesAcs)
+{
+    // Azure Communication Services Email. Local/dev may use a connection string; Azure uses the
+    // resource endpoint with the shared managed-identity credential.
+    builder.Services.AddSingleton(sp =>
+    {
+        var options = sp.GetRequiredService<IOptions<EmailOptions>>().Value;
+        if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            return new EmailClient(options.ConnectionString);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Endpoint))
+        {
+            return new EmailClient(new Uri(options.Endpoint), azureCredential);
+        }
+
+        throw new InvalidOperationException(
+            "Email:ConnectionString or Email:Endpoint must be configured when Email:Provider is 'Acs'.");
+    });
+    builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+}
+
+builder.Services.AddSingleton<EmailTemplateService>();
+builder.Services.AddScoped<StoreEmailService>();
+builder.Services.AddHostedService<AbandonedCartReminderWorker>();
 
 var app = builder.Build();
 

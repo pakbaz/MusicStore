@@ -51,6 +51,11 @@ namespace MvcMusicStore.Models
         public string? UserName { get; set; }
 
         [Required]
+        [EmailAddress]
+        [Display(Name = "Email address")]
+        public string? Email { get; set; }
+
+        [Required]
         [StringLength(100, ErrorMessage = "The {0} must be at least {2} characters long.", MinimumLength = 6)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
@@ -60,5 +65,22 @@ namespace MvcMusicStore.Models
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string? ConfirmPassword { get; set; }
+
+        [Display(Name = "Email me newsletters and new-release announcements")]
+        public bool SubscribeToNewsletter { get; set; }
+    }
+
+    public class EmailPreferencesViewModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email address")]
+        public string? Email { get; set; }
+
+        [Display(Name = "Newsletters and new-release announcements")]
+        public bool EmailMarketingOptIn { get; set; }
+
+        [Display(Name = "Reminders about items left in my cart")]
+        public bool AbandonedCartOptIn { get; set; }
     }
 }

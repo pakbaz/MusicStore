@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 
 namespace MvcMusicStore.Controllers
@@ -85,7 +86,14 @@ namespace MvcMusicStore.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser { UserName = model.UserName };
+                var user = new ApplicationUser
+                {
+                    UserName = model.UserName,
+                    Email = model.Email,
+                    EmailMarketingOptIn = model.SubscribeToNewsletter,
+                    AbandonedCartOptIn = true,
+                    UnsubscribeToken = Guid.NewGuid().ToString("N"),
+                };
                 var result = await _userManager.CreateAsync(user, model.Password!);
                 if (result.Succeeded)
                 {
@@ -333,6 +341,108 @@ namespace MvcMusicStore.Controllers
             var linkedAccounts = await _userManager.GetLoginsAsync(user!);
             ViewBag.ShowRemoveButton = await HasPasswordAsync() || linkedAccounts.Count > 1;
             return PartialView("_RemoveAccountPartial", linkedAccounts);
+        }
+
+        //
+        // GET: /Account/EmailPreferences
+        public async Task<IActionResult> EmailPreferences()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login");
+            }
+
+            return View(new EmailPreferencesViewModel
+            {
+                Email = user.Email,
+                EmailMarketingOptIn = user.EmailMarketingOptIn,
+                AbandonedCartOptIn = user.AbandonedCartOptIn,
+            });
+        }
+
+        //
+        // POST: /Account/EmailPreferences
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EmailPreferences(EmailPreferencesViewModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            user.Email = model.Email;
+            user.EmailMarketingOptIn = model.EmailMarketingOptIn;
+            user.AbandonedCartOptIn = model.AbandonedCartOptIn;
+            if (string.IsNullOrWhiteSpace(user.UnsubscribeToken))
+            {
+                user.UnsubscribeToken = Guid.NewGuid().ToString("N");
+            }
+
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded)
+            {
+                ViewBag.StatusMessage = "Your email preferences have been saved.";
+            }
+            else
+            {
+                AddErrors(result);
+            }
+
+            return View(model);
+        }
+
+        //
+        // GET: /Account/Unsubscribe
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> Unsubscribe(string? token, string? type)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                ViewBag.Success = false;
+                return View();
+            }
+
+            // Cosmos can't translate AnyAsync/First-with-predicate cleanly; materialize a single match.
+            var matches = await _userManager.Users
+                .Where(u => u.UnsubscribeToken == token)
+                .Take(1)
+                .ToListAsync();
+            var user = matches.FirstOrDefault();
+
+            if (user == null)
+            {
+                ViewBag.Success = false;
+                return View();
+            }
+
+            if (string.Equals(type, "marketing", StringComparison.OrdinalIgnoreCase))
+            {
+                user.EmailMarketingOptIn = false;
+            }
+            else if (string.Equals(type, "cart", StringComparison.OrdinalIgnoreCase))
+            {
+                user.AbandonedCartOptIn = false;
+            }
+            else
+            {
+                user.EmailMarketingOptIn = false;
+                user.AbandonedCartOptIn = false;
+            }
+
+            await _userManager.UpdateAsync(user);
+
+            ViewBag.Success = true;
+            ViewBag.UnsubscribeType = type;
+            return View();
         }
 
         #region Helpers

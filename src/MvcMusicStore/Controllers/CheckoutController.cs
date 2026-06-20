@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Controllers
 {
@@ -11,11 +12,13 @@ namespace MvcMusicStore.Controllers
     public class CheckoutController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly StoreEmailService storeEmail;
         const string PromoCode = "FREE";
 
-        public CheckoutController(MusicStoreEntities storeDb)
+        public CheckoutController(MusicStoreEntities storeDb, StoreEmailService storeEmail)
         {
             storeDB = storeDb;
+            this.storeEmail = storeEmail;
         }
 
         //
@@ -70,6 +73,9 @@ namespace MvcMusicStore.Controllers
 
             // Save all changes
             await storeDB.SaveChangesAsync();
+
+            // Send the transactional order confirmation (failures are logged, never block checkout).
+            await storeEmail.SendOrderConfirmationAsync(order);
 
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
