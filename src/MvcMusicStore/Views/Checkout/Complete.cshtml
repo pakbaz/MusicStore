@@ -46,6 +46,7 @@
 <p>Your order has been placed and your cart has been cleared.</p>
 
 <p>
-    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Continue shopping</a>
-    <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
+    <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Order")">My orders</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
 </p>
