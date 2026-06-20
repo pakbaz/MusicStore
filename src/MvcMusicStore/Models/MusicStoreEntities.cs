@@ -52,6 +52,7 @@ namespace MvcMusicStore.Models
             {
                 b.ToContainer("Orders");
                 b.HasKey(o => o.OrderId);
+                b.Property(o => o.PaymentStatus).HasConversion<string>();
                 b.OwnsMany(o => o.OrderDetails, d =>
                 {
                     d.Ignore(x => x.Album);

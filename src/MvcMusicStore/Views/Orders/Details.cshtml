@@ -1,0 +1,62 @@
+﻿@model MvcMusicStore.ViewModels.OrderHistoryDetailsViewModel
+
+@{
+    ViewBag.Title = $"Order {Model.Order.OrderId}";
+}
+
+<h2>Order @Model.Order.OrderId</h2>
+
+<dl class="dl-horizontal">
+    <dt>Date</dt>
+    <dd>@Model.Order.OrderDate.ToString("g")</dd>
+
+    <dt>Payment status</dt>
+    <dd>@await Html.PartialAsync("_PaymentStatusBadge", Model.Order.PaymentStatus)</dd>
+
+    <dt>Payment method</dt>
+    <dd>@(string.IsNullOrEmpty(Model.Order.PaymentProvider) ? "—" : Model.Order.PaymentProvider)</dd>
+
+    @if (Model.Order.PaidDate.HasValue)
+    {
+        <dt>Paid on</dt>
+        <dd>@Model.Order.PaidDate.Value.ToString("g")</dd>
+    }
+
+    <dt>Ship to</dt>
+    <dd>
+        @Model.Order.FirstName @Model.Order.LastName<br />
+        @Model.Order.Address<br />
+        @Model.Order.City, @Model.Order.State @Model.Order.PostalCode<br />
+        @Model.Order.Country
+    </dd>
+</dl>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Album</th>
+            <th class="text-right">Qty</th>
+            <th class="text-right">Unit price</th>
+            <th class="text-right">Line total</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.Items)
+        {
+            <tr>
+                <td>@item.Title</td>
+                <td class="text-right">@item.Quantity</td>
+                <td class="text-right">@item.UnitPrice.ToString("C")</td>
+                <td class="text-right">@item.LineTotal.ToString("C")</td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <th colspan="3" class="text-right">Total</th>
+            <th class="text-right">@Model.Order.Total.ToString("C")</th>
+        </tr>
+    </tfoot>
+</table>
+
+<p><a class="btn btn-default" href="@Url.Action("Index", "Orders")">Back to my orders</a></p>

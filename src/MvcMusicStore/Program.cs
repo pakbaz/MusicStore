@@ -28,6 +28,12 @@ builder.Services.Configure<StorageOptions>(
 builder.Services.Configure<MusicGenOptions>(
     builder.Configuration.GetSection(MusicGenOptions.SectionName));
 
+// Stripe payment provider (Checkout hosted redirect). Secrets (SecretKey, WebhookSecret) come
+// from user-secrets / environment / Key Vault, never appsettings.
+builder.Services.Configure<StripeOptions>(
+    builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddSingleton<IPaymentService, StripePaymentService>();
+
 // Shared managed-identity credential. A single instance is reused for Blob Storage and both
 // Cosmos DbContexts so EF Core caches one internal service provider instead of building a new
 // one per request (which triggers ManyServiceProvidersCreatedWarning and fails after 20).

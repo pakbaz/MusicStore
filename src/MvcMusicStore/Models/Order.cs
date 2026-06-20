@@ -63,6 +63,21 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
+        [ScaffoldColumn(false)]
+        public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
+
+        [ScaffoldColumn(false)]
+        public string? PaymentProvider { get; set; }
+
+        [ScaffoldColumn(false)]
+        public string? PaymentReference { get; set; }
+
+        [ScaffoldColumn(false)]
+        public string? PaymentIntentId { get; set; }
+
+        [ScaffoldColumn(false)]
+        public DateTime? PaidDate { get; set; }
+
         public List<OrderDetail>? OrderDetails { get; set; }
     }
 }

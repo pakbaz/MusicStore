@@ -1,4 +1,5 @@
-﻿@model int
+﻿@model MvcMusicStore.ViewModels.OrderConfirmationViewModel
+@using MvcMusicStore.Models
 
 @{
     ViewBag.Title = "Checkout Complete";
@@ -6,13 +7,51 @@
 
 <h2>Checkout Complete</h2>
 
-<div class="alert alert-success">
-    Thanks for your order! Your confirmation number is <strong>@Model</strong>.
-</div>
+@switch (Model.PaymentStatus)
+{
+    case PaymentStatus.Paid:
+        <div class="alert alert-success">
+            Thanks for your order! Your confirmation number is <strong>@Model.OrderId</strong>.
+        </div>
+        <p>
+            Payment received@(string.IsNullOrEmpty(Model.PaymentProvider) ? "" : $" via {Model.PaymentProvider}").
+            Your cart has been cleared.
+        </p>
+        break;
+    case PaymentStatus.Pending:
+        <div class="alert alert-info">
+            Your order <strong>@Model.OrderId</strong> is awaiting payment confirmation.
+        </div>
+        <p>
+            We're still waiting for your payment to be confirmed. This usually only takes a moment — the
+            status will update automatically. You can also check
+            <a href="@Url.Action("Index", "Orders")">your orders</a>.
+        </p>
+        break;
+    case PaymentStatus.Failed:
+    case PaymentStatus.Cancelled:
+        <div class="alert alert-danger">
+            Payment for order <strong>@Model.OrderId</strong> was not completed.
+        </div>
+        <p>
+            No charge was made and your cart still has your items. You can
+            <a href="@Url.Action("AddressAndPayment", "Checkout")">try checking out again</a>.
+        </p>
+        break;
+    case PaymentStatus.Refunded:
+        <div class="alert alert-warning">
+            Order <strong>@Model.OrderId</strong> has been refunded.
+        </div>
+        break;
+}
 
-<p>Your order has been placed and your cart has been cleared.</p>
+@if (Model.Total > 0)
+{
+    <p><strong>Order total:</strong> @Model.Total.ToString("C")</p>
+}
 
 <p>
     <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Continue shopping</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Orders")">My orders</a>
     <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
 </p>

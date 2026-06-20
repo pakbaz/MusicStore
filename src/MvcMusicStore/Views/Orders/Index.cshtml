@@ -1,0 +1,39 @@
+﻿@model List<MvcMusicStore.Models.Order>
+
+@{
+    ViewBag.Title = "My Orders";
+}
+
+<h2>My Orders</h2>
+
+@if (Model.Count == 0)
+{
+    <p>You haven't placed any orders yet.</p>
+    <p><a class="btn btn-primary" href="@Url.Action("Index", "Store")">Browse music</a></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Order #</th>
+                <th>Date</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var order in Model)
+            {
+                <tr>
+                    <td>@order.OrderId</td>
+                    <td>@order.OrderDate.ToString("g")</td>
+                    <td>@order.Total.ToString("C")</td>
+                    <td>@await Html.PartialAsync("_PaymentStatusBadge", order.PaymentStatus)</td>
+                    <td><a href="@Url.Action("Details", "Orders", new { id = order.OrderId })">Details</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

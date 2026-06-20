@@ -82,8 +82,9 @@ flowchart LR
 | --- | --- | --- |
 | Web app | `src/MvcMusicStore/Program.cs` | Registers MVC, EF Core Cosmos contexts, Identity, sessions, Blob Storage, HTTP clients, hosted workers, and the default MVC route. |
 | Storefront | `HomeController`, `StoreController`, Razor views | Home page sections, catalog search/filter/sort, genre browsing, album details, and artist pages. |
-| Shopping and checkout | `ShoppingCartController`, `CheckoutController`, `ShoppingCart` | Session-based cart identity, persisted cart rows, order creation, and order detail ownership. |
-| Administration | `StoreManagerController` | Administrator-only CRUD for albums plus custom thumbnail uploads and metadata artwork lookup. |
+| Shopping and checkout | `ShoppingCartController`, `CheckoutController`, `ShoppingCart` | Session-based cart identity, persisted cart rows, Stripe Checkout payment, order finalization on capture, and the Stripe webhook. |
+| Order history | `OrdersController` | Signed-in shoppers review their past orders and per-order payment status. |
+| Administration | `StoreManagerController` | Administrator-only CRUD for albums plus custom thumbnail uploads, metadata artwork lookup, and order/refund management. |
 | Authentication | `AccountController`, `ApplicationDbContext` | ASP.NET Core Identity users, roles, claims, logins, and tokens stored in Cosmos containers. |
 | Media | `MediaController` | Streams private Blob Storage thumbnails and generated music through `/media/thumbnails/...` and `/media/music/...`. |
 | Metadata enrichment | `AlbumMetadataEnrichmentWorker`, `MusicBrainzAlbumArtworkService` | Periodically enriches albums with release dates and cached cover art from MusicBrainz and Cover Art Archive. |
@@ -99,7 +100,7 @@ The application uses EF Core's Azure Cosmos DB provider for both catalog data an
 | Catalog | `Albums`, `Genres`, `Artists`, `Carts`, `Orders` |
 | Identity | `Identity_Users`, `Identity_Roles`, `Identity_UserClaims`, `Identity_UserRoles`, `Identity_UserLogins`, `Identity_RoleClaims`, `Identity_UserTokens` |
 
-Catalog entities denormalize display fields such as artist name, genre name, album art URL, release date, availability, and generated audio URL so storefront pages can render from Cosmos without relational joins. Orders own their order details as embedded data.
+Catalog entities denormalize display fields such as artist name, genre name, album art URL, release date, availability, and generated audio URL so storefront pages can render from Cosmos without relational joins. Orders own their order details as embedded data and carry payment state (status, provider, checkout session reference, payment intent, and paid date).
 
 ### Media and thumbnail flow
 
@@ -122,6 +123,17 @@ Metadata thumbnails and generated MP3 files are stored in private Blob Storage c
 6. The web app uploads the MP3 to the `music` blob container.
 7. A new `Album` and, when needed, `Artist` are saved to Cosmos.
 8. The browser polls `AiMusicController.Status` until it receives the catalog album ID and audio URL.
+
+### Checkout and payment flow
+
+Checkout uses **Stripe Checkout** in hosted-redirect mode, so raw card data never touches the app.
+
+1. The shopper submits the address form. Leaving the promo code blank starts a card payment; the promotional code `FREE` instead places a $0 order and skips Stripe.
+2. A `Pending` order is persisted (so the address and line items survive the redirect) and the cart is left intact. The shopper is redirected to the Stripe-hosted payment page.
+3. On success Stripe redirects to `/Checkout/Complete?session_id=...`; the app verifies the session, marks the order `Paid`, records the payment intent, and clears the cart. The `/Checkout/Webhook` endpoint confirms the same result server-to-server (idempotent) and also handles asynchronous success/failure and refunds.
+4. On cancel the shopper returns to the cart with their items intact and a clear message.
+
+Shoppers see payment status on the confirmation page and under **My Orders** (`/Orders`). Administrators review every order and issue refunds from **Store Manager → Manage Orders**. When no Stripe secret key is configured, card payment is disabled and checkout falls back to the promo-code path.
 
 ## Running locally
 
@@ -146,6 +158,32 @@ ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:5090 dotnet 
 Open `http://127.0.0.1:5090/`.
 
 The default administrator account is configured by `AppSettings:DefaultAdminUsername` and `AppSettings:DefaultAdminPassword`. Change the password before using any shared environment.
+
+### Configuring Stripe payments
+
+Only the non-secret `Stripe:Currency` lives in `appsettings.json`. Keep keys out of source control and provide them through user-secrets (local), environment variables, or Key Vault (Azure).
+
+```bash
+cd src/MvcMusicStore
+dotnet user-secrets init
+dotnet user-secrets set "Stripe:SecretKey" "sk_test_..."
+dotnet user-secrets set "Stripe:WebhookSecret" "whsec_..."
+```
+
+Equivalent environment variables (note the `__` section separator):
+
+```bash
+export Stripe__SecretKey="sk_test_..."
+export Stripe__WebhookSecret="whsec_..."
+```
+
+Forward webhook events to the local app and pay with the Stripe test card `4242 4242 4242 4242` (any future expiry and any CVC):
+
+```bash
+stripe listen --forward-to http://localhost:5090/Checkout/Webhook
+```
+
+The `whsec_...` value printed by `stripe listen` is the webhook secret to configure above. Use Stripe **test mode** keys for local development.
 
 ### Running local music generation
 
@@ -172,6 +210,8 @@ The `infra` folder provisions:
 - Role assignments for ACR pull, Cosmos data contributor, and Storage Blob Data Contributor.
 
 The web container receives Cosmos endpoint, storage blob endpoint, container names, musicgen internal URL, managed identity client ID, and admin credentials through Container Apps environment variables and secrets. The musicgen container is internal-only and is called by the web app inside the Container Apps environment.
+
+For production payments, supply `Stripe:SecretKey` and `Stripe:WebhookSecret` as Container Apps secrets (or Key Vault references) rather than plain environment variables, and point the Stripe dashboard webhook at the deployed `/Checkout/Webhook` endpoint.
 
 `azure.yaml` defines both deployable services:
 

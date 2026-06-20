@@ -1,0 +1,64 @@
+﻿@model List<MvcMusicStore.Models.Order>
+@using MvcMusicStore.Models
+
+@{
+    ViewBag.Title = "Manage Orders";
+}
+
+<h2>Manage Orders</h2>
+
+@if (TempData["OrderMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["OrderMessage"]</div>
+}
+@if (TempData["OrderError"] != null)
+{
+    <div class="alert alert-danger">@TempData["OrderError"]</div>
+}
+
+<p>@Html.ActionLink("Back to catalog", "Index")</p>
+
+@if (Model.Count == 0)
+{
+    <p>No orders have been placed yet.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Order #</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th class="text-right">Total</th>
+                <th>Payment</th>
+                <th>Method</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var order in Model)
+            {
+                <tr>
+                    <td>@order.OrderId</td>
+                    <td>@order.OrderDate.ToString("g")</td>
+                    <td>@order.Username</td>
+                    <td class="text-right">@order.Total.ToString("C")</td>
+                    <td>@await Html.PartialAsync("_PaymentStatusBadge", order.PaymentStatus)</td>
+                    <td>@(string.IsNullOrEmpty(order.PaymentProvider) ? "—" : order.PaymentProvider)</td>
+                    <td>
+                        @if (order.PaymentStatus == PaymentStatus.Paid)
+                        {
+                            <form asp-action="RefundOrder" method="post"
+                                  onsubmit="return confirm('Refund order @order.OrderId?');" style="display:inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@order.OrderId" />
+                                <button type="submit" class="btn btn-warning btn-xs">Refund</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
