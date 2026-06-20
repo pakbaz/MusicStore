@@ -63,6 +63,16 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
+        // Loyalty rewards applied to this order. Set server-side (never model-bound).
+        [ScaffoldColumn(false)]
+        public int LoyaltyPointsRedeemed { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal LoyaltyDiscount { get; set; }
+
+        [ScaffoldColumn(false)]
+        public int LoyaltyPointsEarned { get; set; }
+
         public List<OrderDetail>? OrderDetails { get; set; }
     }
 }

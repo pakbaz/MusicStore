@@ -30,6 +30,16 @@
         </div>
     </div>
     <div class="form-group">
+        @Html.LabelFor(m => m.ReferralCode, new { @class = "col-md-2 control-label" })
+        <div class="col-md-10">
+            @Html.TextBoxFor(m => m.ReferralCode, new { @class = "form-control", placeholder = "Optional", autocomplete = "off" })
+            @if (!string.IsNullOrWhiteSpace(Model?.ReferralCode))
+            {
+                <span class="help-block text-success">You were referred! You'll both earn bonus points after your first purchase.</span>
+            }
+        </div>
+    </div>
+    <div class="form-group">
         <div class="col-md-offset-2 col-md-10">
             <input type="submit" class="btn btn-default" value="Register" />
         </div>

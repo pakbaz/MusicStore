@@ -103,6 +103,50 @@
         </div>
     </fieldset>
 
+    <fieldset class="form-horizontal">
+        <legend>Loyalty Rewards</legend>
+
+        <p>
+            You have <strong>@ViewBag.LoyaltyPoints points</strong>
+            (@ViewBag.LoyaltyTierName tier &middot; @ViewBag.LoyaltyMultiplier&times; earn).
+            This order earns about <strong>@ViewBag.ProjectedEarn points</strong>.
+        </p>
+
+        @{
+            int maxRedeem = (int)ViewBag.MaxRedeemablePoints;
+            int perDollar = (int)ViewBag.PointsPerDollarRedeemed;
+            int increment = (int)ViewBag.RedemptionIncrement;
+            int maxDiscountDollars = perDollar > 0 ? maxRedeem / perDollar : 0;
+        }
+
+        @if (maxRedeem > 0)
+        {
+            <div class="form-group">
+                @Html.Label("PointsToRedeem", "Redeem points", new { @class = "control-label col-md-2" })
+                <div class="col-md-6">
+                    <input type="number"
+                           name="PointsToRedeem"
+                           id="PointsToRedeem"
+                           class="form-control"
+                           min="0"
+                           step="@increment"
+                           max="@maxRedeem"
+                           value="0"
+                           autocomplete="off" />
+                    <span class="help-block">
+                        Redeem up to <strong>@maxRedeem points</strong> for
+                        <strong>@maxDiscountDollars.ToString("C0")</strong> off this order
+                        (@perDollar points = $1, in increments of @increment).
+                    </span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="help-block">Earn more points to unlock a discount on a future order.</p>
+        }
+    </fieldset>
+
     <p>
         <input class="btn btn-primary" type="submit" value="Submit Order" />
         <a class="btn btn-default" href="@Url.Action("Index", "ShoppingCart")">Back to cart</a>

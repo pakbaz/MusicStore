@@ -2,7 +2,7 @@
 
 An upgraded ASP.NET Core MVC version of the classic MVC Music Store sample, running on .NET 10 with Azure Cosmos DB, private Azure Blob Storage media, ASP.NET Core Identity, and an optional ACE-Step text-to-music generation service.
 
-The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, administration, sign-in, shopping cart, checkout, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
+The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, administration, sign-in, shopping cart, checkout, a loyalty rewards and referral program, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
 
 ## Screenshots
 
@@ -85,6 +85,7 @@ flowchart LR
 | Shopping and checkout | `ShoppingCartController`, `CheckoutController`, `ShoppingCart` | Session-based cart identity, persisted cart rows, order creation, and order detail ownership. |
 | Administration | `StoreManagerController` | Administrator-only CRUD for albums plus custom thumbnail uploads and metadata artwork lookup. |
 | Authentication | `AccountController`, `ApplicationDbContext` | ASP.NET Core Identity users, roles, claims, logins, and tokens stored in Cosmos containers. |
+| Loyalty &amp; referrals | `LoyaltyService`, `CheckoutController`, `AccountController`, `LoyaltySummaryViewComponent` | Points earned per purchase with tiered earn multipliers by lifetime spend, points redeemed for a checkout discount, a `/Account/Rewards` dashboard, and a referral program that rewards both parties after the referred customer's first purchase. |
 | Media | `MediaController` | Streams private Blob Storage thumbnails and generated music through `/media/thumbnails/...` and `/media/music/...`. |
 | Metadata enrichment | `AlbumMetadataEnrichmentWorker`, `MusicBrainzAlbumArtworkService` | Periodically enriches albums with release dates and cached cover art from MusicBrainz and Cover Art Archive. |
 | AI Music | `AiMusicController`, `AceStepMusicCreationService`, `AiMusicJobStore` | Starts asynchronous generation jobs, polls job status, calls musicgen, uploads MP3 output to Blob Storage, and inserts the generated track as a catalog album. |
@@ -100,6 +101,8 @@ The application uses EF Core's Azure Cosmos DB provider for both catalog data an
 | Identity | `Identity_Users`, `Identity_Roles`, `Identity_UserClaims`, `Identity_UserRoles`, `Identity_UserLogins`, `Identity_RoleClaims`, `Identity_UserTokens` |
 
 Catalog entities denormalize display fields such as artist name, genre name, album art URL, release date, availability, and generated audio URL so storefront pages can render from Cosmos without relational joins. Orders own their order details as embedded data.
+
+`Identity_Users` records also carry loyalty state (points balance, lifetime spend, lifetime points earned, tier eligibility, referral code, and referred-by code), and `Orders` record any points redeemed, the loyalty discount applied, and points earned. The loyalty economy (earn rate, redemption rate, tier thresholds, and referral rewards) is configured under the `Loyalty` section of `appsettings.json`.
 
 ### Media and thumbnail flow
 

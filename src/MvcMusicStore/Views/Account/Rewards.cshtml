@@ -1,0 +1,135 @@
+@model MvcMusicStore.ViewModels.RewardsViewModel
+@{
+    ViewBag.Title = "Your Rewards";
+}
+
+<h2>Your Rewards</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="panel panel-default">
+            <div class="panel-heading"><strong>Points balance</strong></div>
+            <div class="panel-body">
+                <p class="rewards-balance">
+                    <span class="glyphicon glyphicon-star" aria-hidden="true"></span>
+                    <strong>@Model.Points</strong> points
+                </p>
+                <p>Worth about <strong>@Model.PointsDollarValue.ToString("C")</strong> in checkout discounts
+                    (@Model.PointsPerDollarRedeemed points = $1).</p>
+                <p class="text-muted">
+                    Lifetime points earned: @Model.LifetimePointsEarned &middot;
+                    Lifetime spend: @Model.LifetimeSpend.ToString("C")
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel panel-default">
+            <div class="panel-heading"><strong>@Model.TierName tier</strong> &middot; @Model.TierMultiplier&times; points</div>
+            <div class="panel-body">
+                @if (Model.NextTierName != null)
+                {
+                    <p>
+                        Spend <strong>@Model.SpendToNextTier.ToString("C")</strong> more to reach
+                        <strong>@Model.NextTierName</strong> (@Model.NextTierMultiplier&times; earn).
+                    </p>
+                    <div class="progress" role="progressbar"
+                         aria-valuenow="@Model.NextTierProgressPercent" aria-valuemin="0" aria-valuemax="100"
+                         aria-label="Progress to @Model.NextTierName tier">
+                        <div class="progress-bar" style="width: @Model.NextTierProgressPercent%;">
+                            @Model.NextTierProgressPercent%
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p>You've reached our top tier &mdash; you earn the maximum points on every order. 🎉</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>Refer a friend</strong></div>
+    <div class="panel-body">
+        <p>
+            Share your link or code. When a friend signs up and makes their first purchase,
+            you'll earn <strong>@Model.ReferrerRewardPoints points</strong> and they'll earn
+            <strong>@Model.RefereeRewardPoints points</strong>.
+        </p>
+
+        <div class="form-group">
+            <label for="referral-link">Your referral link</label>
+            <div class="input-group">
+                <input type="text" id="referral-link" class="form-control" readonly
+                       value="@Model.ReferralLink" aria-label="Your referral link" />
+                <span class="input-group-btn">
+                    <button class="btn btn-primary" type="button"
+                            data-copy-target="#referral-link"
+                            data-copy-label="Copy">Copy</button>
+                </span>
+            </div>
+        </div>
+
+        <p>Your referral code: <strong class="referral-code">@Model.ReferralCode</strong></p>
+
+        @if (Model.WasReferred)
+        {
+            <p class="text-success">You joined through a referral &mdash; your bonus is applied after your first purchase.</p>
+        }
+    </div>
+</div>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>How it works</strong></div>
+    <div class="panel-body">
+        <ul>
+            <li>Earn <strong>@Model.PointsPerDollar points per $1</strong> spent, multiplied by your tier.</li>
+            <li>Redeem points for a discount at checkout (@Model.PointsPerDollarRedeemed points = $1).</li>
+            <li>Climb tiers as your lifetime spend grows to earn points faster.</li>
+            <li>Refer friends to earn bonus points after their first purchase.</li>
+        </ul>
+    </div>
+</div>
+
+<p>
+    <a class="btn btn-default" href="@Url.Action("Manage", "Account")">Back to account</a>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Browse music</a>
+</p>
+
+@section Scripts {
+    <script>
+        (function () {
+            var button = document.querySelector("[data-copy-target]");
+            if (!button) {
+                return;
+            }
+
+            button.addEventListener("click", function () {
+                var input = document.querySelector(button.getAttribute("data-copy-target"));
+                if (!input) {
+                    return;
+                }
+
+                input.select();
+                input.setSelectionRange(0, input.value.length);
+
+                var done = function () {
+                    var original = button.getAttribute("data-copy-label") || "Copy";
+                    button.textContent = "Copied!";
+                    window.setTimeout(function () { button.textContent = original; }, 1500);
+                };
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(input.value).then(done, function () {
+                        try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+                    });
+                } else {
+                    try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+                }
+            });
+        }());
+    </script>
+}

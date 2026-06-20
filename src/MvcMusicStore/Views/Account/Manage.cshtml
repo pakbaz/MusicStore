@@ -5,6 +5,15 @@
 <h2>@ViewBag.Title.</h2>
 
 <p class="text-success">@ViewBag.StatusMessage</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <span class="glyphicon glyphicon-star" aria-hidden="true"></span>
+        View your points balance, tier, and referral link on the
+        @Html.ActionLink("Rewards page", "Rewards", "Account").
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-12">
         @if (ViewBag.HasLocalPassword)
