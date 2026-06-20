@@ -1,0 +1,32 @@
+@model MvcMusicStore.ViewModels.GiftRedeemedViewModel
+@{
+    ViewBag.Title = "Gift Redeemed";
+}
+
+<h2>Gift Redeemed</h2>
+
+<div class="alert alert-success">
+    @if (!string.IsNullOrWhiteSpace(Model.AlbumTitle))
+    {
+        <text><strong>@Model.AlbumTitle</strong> has been added to your account</text>
+    }
+    else
+    {
+        <text>Your gift has been added to your account</text>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.SenderName))
+    {
+        <text> — courtesy of @Model.SenderName.</text>
+    }
+    else
+    {
+        <text>.</text>
+    }
+</div>
+
+<p>Your gift order confirmation number is <strong>@Model.OrderId</strong>.</p>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Browse more music</a>
+    <a class="btn btn-default" href="@Url.Action("Complete", "Checkout", new { id = Model.OrderId })">View order</a>
+</p>
