@@ -1,0 +1,75 @@
+﻿@model IEnumerable<MvcMusicStore.Models.Sale>
+
+@{
+    ViewBag.Title = "Sales";
+}
+
+<div class="admin-heading">
+    <h2>Sales</h2>
+    <p>
+        @Html.ActionLink("Create new sale", "Create", null, new { @class = "btn btn-primary" })
+        @Html.ActionLink("Manage discount codes", "Index", "DiscountCodes", null, new { @class = "btn btn-default" })
+    </p>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">No sales yet. Create one to start marking down albums.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th class="text-right">Value</th>
+                <th>Window (UTC)</th>
+                <th>Scope</th>
+                <th>Active</th>
+                <th>Featured</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td><strong>@item.Name</strong></td>
+                    <td>@item.DiscountType</td>
+                    <td class="text-right">
+                        @(item.DiscountType == MvcMusicStore.Models.DiscountType.Percentage
+                            ? $"{item.Value:0.##}%"
+                            : item.Value.ToString("C"))
+                    </td>
+                    <td>@item.StartDateUtc.ToString("yyyy-MM-dd") – @item.EndDateUtc.ToString("yyyy-MM-dd")</td>
+                    <td>@(item.AppliesToEntireStore ? "Entire store" : $"{item.AlbumIds.Count} album(s)")</td>
+                    <td>
+                        @if (item.IsActive)
+                        {
+                            <span class="label label-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="label label-default">Inactive</span>
+                        }
+                    </td>
+                    <td>
+                        @if (item.IsFeatured)
+                        {
+                            <span class="label label-warning">Deal of the Day</span>
+                        }
+                        else
+                        {
+                            <text>—</text>
+                        }
+                    </td>
+                    <td>
+                        @Html.ActionLink("Edit", "Edit", new { id = item.SaleId }) |
+                        @Html.ActionLink("Delete", "Delete", new { id = item.SaleId })
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -10,6 +10,8 @@ namespace MvcMusicStore.Models
         private const string ArtistCounter = "Artists";
         private const string OrderCounter = "Orders";
         private const string CartCounter = "Carts";
+        private const string DiscountCodeCounter = "DiscountCodes";
+        private const string SaleCounter = "Sales";
         private const string WishlistCounter = "Wishlists";
         private const string BundleCounter = "Bundles";
 
@@ -37,6 +39,8 @@ namespace MvcMusicStore.Models
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<WishlistItem> WishlistItems { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<DiscountCode> DiscountCodes { get; set; }
+        public DbSet<Sale>      Sales { get; set; }
         public DbSet<Bundle>    Bundles { get; set; }
         public DbSet<Review>    Reviews { get; set; }
         public DbSet<GiftCard>  GiftCards { get; set; }
@@ -102,6 +106,12 @@ namespace MvcMusicStore.Models
                 });
             });
 
+            modelBuilder.Entity<DiscountCode>(b =>
+            {
+                b.ToContainer("DiscountCodes");
+                b.HasKey(c => c.DiscountCodeId);
+            });
+
             modelBuilder.Entity<Review>(b =>
             {
                 b.ToContainer("Reviews");
@@ -119,6 +129,12 @@ namespace MvcMusicStore.Models
             {
                 b.ToContainer("Gifts");
                 b.HasKey(g => g.AlbumGiftId);
+            });
+
+            modelBuilder.Entity<Sale>(b =>
+            {
+                b.ToContainer("Sales");
+                b.HasKey(s => s.SaleId);
             });
 
             // The Azure Cosmos DB provider does not support index definitions; strip any conventional indexes.
@@ -146,6 +162,12 @@ namespace MvcMusicStore.Models
         public Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
             => Sequences.NextAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
 
+        public Task<int> NextDiscountCodeIdAsync(CancellationToken cancellationToken = default)
+            => Sequences.NextAsync(DiscountCodeCounter, MaxDiscountCodeIdAsync, cancellationToken);
+
+        public Task<int> NextSaleIdAsync(CancellationToken cancellationToken = default)
+            => Sequences.NextAsync(SaleCounter, MaxSaleIdAsync, cancellationToken);
+
         public Task<int> NextWishlistRecordIdAsync(CancellationToken cancellationToken = default)
             => Sequences.NextAsync(WishlistCounter, MaxWishlistRecordIdAsync, cancellationToken);
 
@@ -162,6 +184,8 @@ namespace MvcMusicStore.Models
             await Sequences.EnsureInitializedAsync(ArtistCounter, MaxArtistIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(OrderCounter, MaxOrderIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
+            await Sequences.EnsureInitializedAsync(DiscountCodeCounter, MaxDiscountCodeIdAsync, cancellationToken);
+            await Sequences.EnsureInitializedAsync(SaleCounter, MaxSaleIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(WishlistCounter, MaxWishlistRecordIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(BundleCounter, MaxBundleIdAsync, cancellationToken);
         }
@@ -193,6 +217,18 @@ namespace MvcMusicStore.Models
         private async Task<int> MaxCartRecordIdAsync(CancellationToken cancellationToken)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 0 : ids.Max();
+        }
+
+        private async Task<int> MaxDiscountCodeIdAsync(CancellationToken cancellationToken)
+        {
+            var ids = await DiscountCodes.Select(c => c.DiscountCodeId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 0 : ids.Max();
+        }
+
+        private async Task<int> MaxSaleIdAsync(CancellationToken cancellationToken)
+        {
+            var ids = await Sales.Select(s => s.SaleId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 0 : ids.Max();
         }
 

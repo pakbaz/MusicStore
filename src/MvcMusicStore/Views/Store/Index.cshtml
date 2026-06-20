@@ -78,11 +78,28 @@
             {
                 <li>
                     <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
-                        <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                        <span class="album-thumb">
+                            <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                            @if (album.IsOnSale)
+                            {
+                                <span class="sale-badge sale-badge-overlay" title="@album.SaleName">Sale</span>
+                            }
+                        </span>
                         <h2 class="h5">@album.Title</h2>
                     </a>
                     <small class="text-muted">@album.ArtistName</small>
-                    <small class="text-muted">@album.GenreName · @album.Price.ToString("C")</small>
+                    <small class="text-muted">
+                        @album.GenreName ·
+                        @if (album.IsOnSale)
+                        {
+                            <span class="price-was">@album.Price.ToString("C")</span>
+                            <span class="price-now">@album.EffectivePrice.ToString("C")</span>
+                        }
+                        else
+                        {
+                            <span>@album.Price.ToString("C")</span>
+                        }
+                    </small>
                     <div class="album-card-rating">
                         @await Html.PartialAsync("_StarRating", new MvcMusicStore.ViewModels.StarRatingViewModel { Average = album.AverageRating, Count = album.ReviewCount })
                     </div>

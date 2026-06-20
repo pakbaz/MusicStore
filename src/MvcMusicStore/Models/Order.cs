@@ -67,6 +67,16 @@ namespace MvcMusicStore.Models
         public string? Email { get; set; }
 
         [ScaffoldColumn(false)]
+        public decimal Subtotal { get; set; }
+
+        [ScaffoldColumn(false)]
+        [DisplayName("Discount Code")]
+        public string? DiscountCode { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal DiscountAmount { get; set; }
+
+        [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
         // Loyalty rewards applied to this order. Set server-side (never model-bound).

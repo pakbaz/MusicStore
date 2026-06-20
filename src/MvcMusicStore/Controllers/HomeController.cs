@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
@@ -12,10 +13,12 @@ namespace MvcMusicStore.Controllers
         private const int SectionSize = 6;
 
         private readonly MusicStoreEntities storeDB;
+        private readonly IPromotionService promotions;
 
-        public HomeController(MusicStoreEntities storeDb)
+        public HomeController(MusicStoreEntities storeDb, IPromotionService promotions)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
         }
 
         //
@@ -57,11 +60,21 @@ namespace MvcMusicStore.Controllers
                 .ToListAsync();
             curatedAlbums.PopulateNavigation();
 
+            var shownAlbums = featuredAlbums
+                .Concat(trendingAlbums)
+                .Concat(curatedAlbums)
+                .GroupBy(a => a.AlbumId)
+                .Select(g => g.First());
+            var pricing = await promotions.GetPricingLookupAsync(shownAlbums);
+            var deal = await promotions.GetFeaturedDealAsync();
+
             var viewModel = new HomeIndexViewModel
             {
                 FeaturedReleases = featuredAlbums,
                 TrendingReleases = trendingAlbums,
-                CuratedReleases = curatedAlbums
+                CuratedReleases = curatedAlbums,
+                Pricing = pricing,
+                DealOfTheDay = deal
             };
 
             return View(viewModel);

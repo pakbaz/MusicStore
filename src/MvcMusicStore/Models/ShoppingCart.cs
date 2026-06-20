@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using MvcMusicStore.Services;
 
 namespace MvcMusicStore.Models
 {
@@ -19,6 +20,9 @@ namespace MvcMusicStore.Models
         }
 
         public const string CartSessionKey = "CartId";
+
+        // Session slot holding the discount code a shopper applied in the cart, carried into checkout.
+        public const string DiscountCodeSessionKey = "DiscountCode";
 
         public static ShoppingCart GetCart(MusicStoreEntities db, HttpContext context)
         {
@@ -222,9 +226,13 @@ namespace MvcMusicStore.Models
             return cartItems.Sum(item => item.Count * item.LineUnitPrice);
         }
 
-        public async Task<int> CreateOrderAsync(Order order)
+        /// <summary>
+        /// Builds the order from a pre-computed <see cref="CartPricing"/> (sale-adjusted unit
+        /// prices plus any applied discount code) and empties the cart.
+        /// </summary>
+        public async Task<int> CreateOrderAsync(Order order, CartPricing pricing)
         {
-            await BuildOrderAsync(order);
+            await BuildOrderAsync(order, pricing);
 
             // Empty the shopping cart
             await EmptyCartAsync();
@@ -234,13 +242,13 @@ namespace MvcMusicStore.Models
         }
 
         // Populates the order's line items and total from the current cart WITHOUT emptying it.
-        // Used by the payment flow so the cart survives a failed/cancelled payment.
-        public async Task<int> BuildOrderAsync(Order order)
+        // Used by the payment flow so the cart survives a failed/cancelled payment. Bundle lines
+        // are expanded into one order detail per member album at the distributed (discounted) unit
+        // price; non-bundle lines use the sale-adjusted unit price from the supplied pricing.
+        public async Task<int> BuildOrderAsync(Order order, CartPricing pricing)
         {
-            decimal orderTotal = 0;
-
             var cartItems = await GetCartItemsAsync();
-            order.OrderDetails = new List<OrderDetail>();
+            order.OrderDetails ??= new List<OrderDetail>();
 
             // Load the catalog albums backing the cart so each line can capture the album's
             // current title, art, and audio (download) URL as a stable snapshot. Albums are
@@ -262,7 +270,12 @@ namespace MvcMusicStore.Models
 
             var orderDetailId = 1;
 
-            // Iterate over the items in the cart, adding the order details for each
+            // Persist the sale-adjusted unit price each line was actually charged at, plus a
+            // catalog snapshot (title, art, audio) so order history and receipts stay stable.
+            // Bundle members are recorded at their distributed (discounted) unit price; non-bundle
+            // lines are matched to their priced line by cart RecordId for the sale-adjusted price.
+            var effectiveByRecord = pricing.Lines.ToDictionary(l => l.RecordId, l => l.EffectiveUnitPrice);
+
             foreach (var item in cartItems)
             {
                 if (item.IsBundle)
@@ -285,30 +298,34 @@ namespace MvcMusicStore.Models
                             AudioUrl = memberAlbum?.AudioUrl,
                         });
 
-                        orderTotal += member.UnitPrice * item.Count;
+                        // Maintain the denormalized popularity counter (Cosmos-safe; reuse tracked album).
+                        if (memberAlbum != null)
+                        {
+                            memberAlbum.Popularity += item.Count;
+                        }
                     }
 
                     continue;
                 }
 
+                // Non-bundle line: charge the sale-adjusted unit price computed by the promotion engine.
+                var unitPrice = effectiveByRecord.TryGetValue(item.RecordId, out var effective)
+                    ? effective
+                    : item.AlbumPrice;
+
                 albumLookup.TryGetValue(item.AlbumId, out var album);
 
-                var orderDetail = new OrderDetail
+                order.OrderDetails.Add(new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
                     AlbumId = item.AlbumId,
                     OrderId = order.OrderId,
-                    UnitPrice = item.AlbumPrice,
+                    UnitPrice = unitPrice,
                     Quantity = item.Count,
                     AlbumTitle = album?.Title ?? item.AlbumTitle,
-                    AlbumArtUrl = album?.GetDisplayThumbnailUrl() ?? item.AlbumArtUrl,
+                    AlbumArtUrl = album?.GetDisplayThumbnailUrl(),
                     AudioUrl = album?.AudioUrl,
-                };
-
-                // Set the order total of the shopping cart
-                orderTotal += (item.Count * item.AlbumPrice);
-
-                order.OrderDetails.Add(orderDetail);
+                });
 
                 // Maintain the denormalized popularity counter so the catalog can sort by
                 // popularity without scanning the Orders container on every request. Reuse the
@@ -320,8 +337,10 @@ namespace MvcMusicStore.Models
                 }
             }
 
-            // Set the order's total to the orderTotal count
-            order.Total = orderTotal;
+            order.Subtotal = pricing.Subtotal;
+            order.DiscountCode = pricing.AppliedCode;
+            order.DiscountAmount = pricing.DiscountAmount;
+            order.Total = pricing.Total;
 
             // Return the OrderId as the confirmation number
             return order.OrderId;

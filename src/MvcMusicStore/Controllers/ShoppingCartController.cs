@@ -9,15 +9,18 @@ namespace MvcMusicStore.Controllers
     public class ShoppingCartController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IPromotionService promotions;
         private readonly IRecommendationService recommendationService;
         private readonly IBundleService bundleService;
 
         public ShoppingCartController(
             MusicStoreEntities storeDb,
+            IPromotionService promotions,
             IRecommendationService recommendationService,
             IBundleService bundleService)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
             this.recommendationService = recommendationService;
             this.bundleService = bundleService;
         }
@@ -28,6 +31,7 @@ namespace MvcMusicStore.Controllers
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
             var viewModel = await BuildCartViewModelAsync(cart);
             ViewBag.CartMessage = TempData["CartMessage"];
+            viewModel.DiscountMessage = TempData["DiscountMessage"] as string;
             return View(viewModel);
         }
 
@@ -40,6 +44,43 @@ namespace MvcMusicStore.Controllers
             await cart.AddToCartAsync(addedAlbum);
             await storeDB.SaveChangesAsync();
 
+            return RedirectToAction("Index");
+        }
+
+        //
+        // POST: /ShoppingCart/ApplyDiscount
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApplyDiscount(string? code)
+        {
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            var pricing = await promotions.PriceCartAsync(await cart.GetCartItemsAsync(), code);
+
+            if (pricing.DiscountApplied)
+            {
+                SetSessionDiscountCode(pricing.AppliedCode!);
+                TempData["DiscountMessage"] = pricing.DiscountMessage;
+            }
+            else
+            {
+                ClearSessionDiscountCode();
+                TempData["DiscountMessage"] = pricing.DiscountMessage
+                    ?? "That discount code could not be applied.";
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        //
+        // POST: /ShoppingCart/RemoveDiscount
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult RemoveDiscount()
+        {
+            ClearSessionDiscountCode();
+            TempData["DiscountMessage"] = "Discount code removed.";
             return RedirectToAction("Index");
         }
 
@@ -151,6 +192,14 @@ namespace MvcMusicStore.Controllers
         {
             var items = await cart.GetCartItemsAsync();
 
+            var pricing = await promotions.PriceCartAsync(items, GetSessionDiscountCode());
+
+            // Drop a now-invalid stored code so the sale-adjusted totals stay honest.
+            if (!string.IsNullOrEmpty(GetSessionDiscountCode()) && !pricing.DiscountApplied)
+            {
+                ClearSessionDiscountCode();
+            }
+
             var albumIds = items
                 .Where(item => !item.IsBundle)
                 .Select(item => item.AlbumId)
@@ -176,12 +225,22 @@ namespace MvcMusicStore.Controllers
             return new ShoppingCartViewModel
             {
                 CartItems = items,
-                CartTotal = await cart.GetTotalAsync(),
+                Pricing = pricing,
+                CartTotal = pricing.Total,
                 CartCount = await cart.GetCountAsync(),
                 Recommendations = recommendations,
                 SuggestedBundles = suggestedBundles,
                 Message = message
             };
         }
+
+        private string? GetSessionDiscountCode() =>
+            HttpContext.Session.GetString(ShoppingCart.DiscountCodeSessionKey);
+
+        private void SetSessionDiscountCode(string code) =>
+            HttpContext.Session.SetString(ShoppingCart.DiscountCodeSessionKey, code);
+
+        private void ClearSessionDiscountCode() =>
+            HttpContext.Session.Remove(ShoppingCart.DiscountCodeSessionKey);
     }
 }

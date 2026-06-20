@@ -1,0 +1,34 @@
+﻿@model MvcMusicStore.ViewModels.AlbumCardViewModel
+
+<article class="album-card">
+    <a class="album-card-link" href="@Url.AlbumUrl(Model.AlbumId, Model.Title)">
+        <div class="album-card-media">
+            <img alt="@Model.Title" src="@Url.Content(Model.ThumbnailUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+            @if (Model.IsOnSale)
+            {
+                <span class="sale-badge sale-badge-overlay" title="@Model.SaleName">Sale</span>
+            }
+        </div>
+        <div class="album-card-body">
+            <h3 class="album-title">@Model.Title</h3>
+            @if (!string.IsNullOrEmpty(Model.Subtitle))
+            {
+                <p class="album-subtitle">@Model.Subtitle</p>
+            }
+            <p class="album-price">
+                @if (Model.IsOnSale)
+                {
+                    <span class="price-was">@Model.OriginalPrice.ToString("C")</span>
+                    <span class="price-now">@Model.EffectivePrice.ToString("C")</span>
+                }
+                else
+                {
+                    <span>@Model.EffectivePrice.ToString("C")</span>
+                }
+            </p>
+        </div>
+    </a>
+    <div class="album-card-actions">
+        @await Component.InvokeAsync("WishlistButton", new { albumId = Model.AlbumId })
+    </div>
+</article>

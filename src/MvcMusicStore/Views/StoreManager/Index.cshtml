@@ -18,6 +18,9 @@
 <p>
     @Html.ActionLink("Create New", "Create")
     &nbsp;|&nbsp;
+    @Html.ActionLink("Discount codes", "Index", "DiscountCodes", null, new { @class = "btn btn-default" })
+    @Html.ActionLink("Sales & Deal of the Day", "Index", "Sales", null, new { @class = "btn btn-default" })
+    &nbsp;|&nbsp;
     @Html.ActionLink("Manage Orders", "Orders")
     &nbsp;|&nbsp;
     @Html.ActionLink("Manage bundles", "Index", "BundleManager")

@@ -1,0 +1,69 @@
+﻿@model IEnumerable<MvcMusicStore.Models.DiscountCode>
+
+@{
+    ViewBag.Title = "Discount Codes";
+}
+
+<div class="admin-heading">
+    <h2>Discount codes</h2>
+    <p>
+        @Html.ActionLink("Create new code", "Create", null, new { @class = "btn btn-primary" })
+        @Html.ActionLink("Manage sales", "Index", "Sales", null, new { @class = "btn btn-default" })
+    </p>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">No discount codes yet. Create one to get started.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Type</th>
+                <th class="text-right">Value</th>
+                <th class="text-right">Min spend</th>
+                <th>Window (UTC)</th>
+                <th class="text-right">Usage</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td><strong>@item.Code</strong></td>
+                    <td>@item.DiscountType</td>
+                    <td class="text-right">
+                        @(item.DiscountType == MvcMusicStore.Models.DiscountType.Percentage
+                            ? $"{item.Value:0.##}%"
+                            : item.Value.ToString("C"))
+                    </td>
+                    <td class="text-right">@(item.MinimumSpend.HasValue ? item.MinimumSpend.Value.ToString("C") : "—")</td>
+                    <td>
+                        @(item.StartDateUtc?.ToString("yyyy-MM-dd") ?? "Any") –
+                        @(item.EndDateUtc?.ToString("yyyy-MM-dd") ?? "Any")
+                    </td>
+                    <td class="text-right">@item.TimesUsed@(item.UsageLimit.HasValue ? $" / {item.UsageLimit}" : "")</td>
+                    <td>
+                        @if (item.IsActive)
+                        {
+                            <span class="label label-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="label label-default">Inactive</span>
+                        }
+                    </td>
+                    <td>
+                        @Html.ActionLink("Edit", "Edit", new { id = item.DiscountCodeId }) |
+                        @Html.ActionLink("Delete", "Delete", new { id = item.DiscountCodeId })
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

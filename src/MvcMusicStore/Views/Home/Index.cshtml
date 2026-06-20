@@ -32,7 +32,39 @@
     </div>
 </section>
 
-<section class="content-section" aria-label="Top selling albums">
+@if (Model.DealOfTheDay != null)
+{
+    var deal = Model.DealOfTheDay;
+    <section class="deal-panel" aria-label="Deal of the Day">
+        <div class="deal-copy">
+            <p class="deal-kicker">Deal of the Day</p>
+            <h2 class="deal-title">@deal.Album.Title</h2>
+            <p class="deal-artist">by @deal.Album.Artist?.Name</p>
+            <p class="deal-pricing">
+                <span class="price-was">@deal.Pricing.OriginalPrice.ToString("C")</span>
+                <span class="price-now">@deal.Pricing.EffectivePrice.ToString("C")</span>
+                @if (deal.Pricing.PercentOff.HasValue)
+                {
+                    <span class="deal-percent">@deal.Pricing.PercentOff.Value% off</span>
+                }
+            </p>
+            <div class="deal-countdown" data-deal-ends-utc="@deal.EndsUtc.ToString("o")" role="timer" aria-live="polite">
+                <span class="deal-countdown-label">Hurry &mdash; ends in</span>
+                <span class="deal-countdown-clock" data-deal-countdown>--:--:--</span>
+            </div>
+            <div class="deal-actions">
+                <a class="btn btn-primary btn-lg" href="@Url.Action("AddToCart", "ShoppingCart", new { id = deal.Album.AlbumId })">Add to cart</a>
+                <a class="btn btn-default btn-lg" href="@Url.AlbumUrl(deal.Album.AlbumId, deal.Album.Title)">View album</a>
+            </div>
+        </div>
+        <div class="deal-media">
+            <span class="sale-badge deal-media-badge">@(deal.Pricing.PercentOff is int pct ? $"{pct}% off" : "On sale")</span>
+            <img alt="@deal.Album.Title" src="@Url.Content(deal.Album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+        </div>
+    </section>
+}
+
+<section class="content-section" aria-label="Featured releases">
     <div class="section-heading">
         <h2>Featured releases</h2>
         <a class="section-link" href="@Url.Action("Index", "Store")">View all genres</a>
@@ -40,18 +72,7 @@
     <div class="album-grid">
     @foreach (var album in Model.FeaturedReleases)
     {
-        <article class="album-card">
-            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
-                <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
-                <div class="album-card-body">
-                    <h3 class="album-title">@album.Title</h3>
-                    <p class="album-price">@album.Artist?.Name</p>
-                </div>
-            </a>
-            <div class="album-card-actions">
-                @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
-            </div>
-        </article>
+        @await Html.PartialAsync("_AlbumCard", MvcMusicStore.ViewModels.AlbumCardViewModel.FromAlbum(album, Model.Pricing, album.Artist?.Name))
     }
     </div>
 </section>
@@ -64,18 +85,7 @@
     <div class="album-grid">
     @foreach (var album in Model.TrendingReleases)
     {
-        <article class="album-card">
-            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
-                <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
-                <div class="album-card-body">
-                    <h3 class="album-title">@album.Title</h3>
-                    <p class="album-price">@album.Price.ToString("C")</p>
-                </div>
-            </a>
-            <div class="album-card-actions">
-                @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
-            </div>
-        </article>
+        @await Html.PartialAsync("_AlbumCard", MvcMusicStore.ViewModels.AlbumCardViewModel.FromAlbum(album, Model.Pricing, album.Artist?.Name))
     }
     </div>
 </section>
@@ -88,20 +98,13 @@
     <div class="album-grid">
     @foreach (var album in Model.CuratedReleases)
     {
-        <article class="album-card">
-            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
-                <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
-                <div class="album-card-body">
-                    <h3 class="album-title">@album.Title</h3>
-                    <p class="album-price">@album.Artist?.Name</p>
-                </div>
-            </a>
-            <div class="album-card-actions">
-                @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
-            </div>
-        </article>
+        @await Html.PartialAsync("_AlbumCard", MvcMusicStore.ViewModels.AlbumCardViewModel.FromAlbum(album, Model.Pricing, album.Artist?.Name))
     }
     </div>
 </section>
 
 @Html.Raw(StructuredData.HomeGraph(siteUrl, searchTemplate, logoUrl))
+
+@section scripts {
+    <script src="~/Scripts/deal-countdown.js"></script>
+}

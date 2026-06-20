@@ -9,9 +9,9 @@ namespace MvcMusicStore.Models
     {
         public static async Task SeedAsync(MusicStoreEntities context)
         {
-            // Only seed if no data exists. Cosmos translates AnyAsync() into an EXISTS subquery
-            // ("SELECT ... FROM root c") that Cosmos rejects with "Identifier 'root' could not be
-            // resolved", so test for existing data with a Take(1) materialization instead.
+            // Only seed the catalog if no data exists. Cosmos translates AnyAsync() into an EXISTS
+            // subquery ("SELECT ... FROM root c") that Cosmos rejects with "Identifier 'root' could
+            // not be resolved", so test for existing data with a Take(1) materialization instead.
             var alreadySeeded = (await context.Genres.Select(g => g.GenreId).Take(1).ToListAsync()).Count != 0;
             if (!alreadySeeded)
             {
@@ -43,9 +43,64 @@ namespace MvcMusicStore.Models
                 await context.SaveChangesAsync();
             }
 
+            // Promotions seed independently so the demo code + Deal of the Day appear even when the
+            // catalog was seeded by an earlier build. Each has its own empty-container guard.
+            await SeedPromotionsAsync(context);
+
             // Seed sample reviews independently so existing databases also gain social proof on the
             // next startup. Seeded reviews are demo data and intentionally bypass the purchase gate.
             await SeedReviewsAsync(context);
+        }
+
+        private static async Task SeedPromotionsAsync(MusicStoreEntities context)
+        {
+            var now = DateTime.UtcNow;
+
+            // Seed the demo SAVE20 code only when no discount codes exist yet.
+            var hasDiscountCodes = (await context.DiscountCodes.Select(c => c.DiscountCodeId).Take(1).ToListAsync()).Count != 0;
+            if (!hasDiscountCodes)
+            {
+                context.DiscountCodes.Add(new DiscountCode
+                {
+                    DiscountCodeId = await context.NextDiscountCodeIdAsync(),
+                    Code = DiscountCode.Normalize("SAVE20"),
+                    Description = "20% off orders of $20 or more",
+                    DiscountType = DiscountType.Percentage,
+                    Value = 20m,
+                    MinimumSpend = 20m,
+                    UsageLimit = null,
+                    TimesUsed = 0,
+                    IsActive = true
+                });
+            }
+
+            // Seed a featured "Deal of the Day" only when no sales exist yet.
+            var hasSales = (await context.Sales.Select(s => s.SaleId).Take(1).ToListAsync()).Count != 0;
+            if (!hasSales)
+            {
+                var albums = await context.Albums.ToListAsync();
+                var target = albums.FirstOrDefault(a => a.IsFeatured)
+                    ?? albums.OrderByDescending(a => a.Price).FirstOrDefault();
+
+                if (target is not null)
+                {
+                    context.Sales.Add(new Sale
+                    {
+                        SaleId = await context.NextSaleIdAsync(),
+                        Name = "Deal of the Day",
+                        DiscountType = DiscountType.Percentage,
+                        Value = 30m,
+                        StartDateUtc = now.AddHours(-1),
+                        EndDateUtc = now.AddHours(24),
+                        IsActive = true,
+                        IsFeatured = true,
+                        AppliesToEntireStore = false,
+                        AlbumIds = new List<int> { target.AlbumId }
+                    });
+                }
+            }
+
+            await context.SaveChangesAsync();
         }
 
         private static async Task SeedReviewsAsync(MusicStoreEntities context)

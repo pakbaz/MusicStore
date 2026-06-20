@@ -1,0 +1,30 @@
+﻿@model MvcMusicStore.Models.Sale
+
+@{
+    ViewBag.Title = "Edit Sale";
+}
+
+<h2>Edit sale</h2>
+
+@using (Html.BeginForm("Edit", "Sales", new { id = Model.SaleId }, FormMethod.Post))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.SaleId)
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true)
+        @await Html.PartialAsync("_Fields", Model)
+
+        <div class="form-group">
+            <div class="col-md-offset-3 col-md-7">
+                <input type="submit" value="Save changes" class="btn btn-primary" />
+                @Html.ActionLink("Back to list", "Index", null, new { @class = "btn btn-link" })
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}

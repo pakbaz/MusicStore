@@ -14,15 +14,18 @@ namespace MvcMusicStore.Controllers
         private const int RelatedArtistAlbumCount = 6;
 
         private readonly MusicStoreEntities storeDB;
+        private readonly IPromotionService promotions;
         private readonly IRecommendationService recommendationService;
         private readonly IBundleService bundleService;
 
         public StoreController(
             MusicStoreEntities storeDb,
+            IPromotionService promotions,
             IRecommendationService recommendationService,
             IBundleService bundleService)
         {
             storeDB = storeDb;
+            this.promotions = promotions;
             this.recommendationService = recommendationService;
             this.bundleService = bundleService;
         }
@@ -156,6 +159,19 @@ namespace MvcMusicStore.Controllers
                     .ToList();
             }
 
+            // Price the materialized page against active sales so catalog cards can show sale badges
+            // and slashed prices. Only the current page is priced, so this stays cheap.
+            var pricingLookup = await promotions.GetPricingLookupAsync(
+                albumList.Select(a => new Album { AlbumId = a.AlbumId, Price = a.Price }));
+            foreach (var item in albumList)
+            {
+                if (pricingLookup.TryGetValue(item.AlbumId, out var pricing))
+                {
+                    item.EffectivePrice = pricing.EffectivePrice;
+                    item.SaleName = pricing.SaleName;
+                }
+            }
+
             // Genre filter options come from the small Genres container rather than a distinct scan
             // over the entire Albums container.
             var genreNames = (await storeDB.Genres
@@ -223,6 +239,9 @@ namespace MvcMusicStore.Controllers
                 .ToListAsync();
             moreFromArtist.PopulateNavigation();
 
+            var albumPricing = await promotions.GetPricingAsync(album);
+            var relatedPricing = await promotions.GetPricingLookupAsync(
+                relatedByGenre.Concat(moreFromArtist));
             var alsoBought = (await recommendationService.GetAlsoBoughtAsync(id)).ToList();
             var bundles = (await bundleService.GetBundlesContainingAlbumAsync(id)).ToList();
             var reviews = await BuildAlbumReviewsAsync(album, reviewsPage);
@@ -230,8 +249,10 @@ namespace MvcMusicStore.Controllers
             var viewModel = new AlbumDetailsViewModel
             {
                 Album = album,
+                Pricing = albumPricing,
                 RelatedByGenre = relatedByGenre,
                 MoreFromArtist = moreFromArtist,
+                RelatedPricing = relatedPricing,
                 AlsoBought = alsoBought,
                 Bundles = bundles,
                 Reviews = reviews
@@ -313,6 +334,7 @@ namespace MvcMusicStore.Controllers
                 ArtistName = row.ArtistName ?? string.Empty,
                 GenreName = row.GenreName ?? string.Empty,
                 Price = row.Price,
+                EffectivePrice = row.Price,
                 ReleaseDate = row.ReleaseDate,
                 IsAvailable = row.IsAvailable,
                 Popularity = row.Popularity,

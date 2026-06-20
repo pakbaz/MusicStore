@@ -2,6 +2,7 @@
 
 @{
     ViewBag.Title = "Address And Payment";
+    var pricing = ViewBag.Pricing as MvcMusicStore.Services.CartPricing ?? new MvcMusicStore.Services.CartPricing();
 }
 
 @section scripts {
@@ -101,6 +102,48 @@
     </fieldset>
 
     <fieldset class="form-horizontal">
+        <legend>Order summary</legend>
+        <table class="table checkout-summary">
+            <caption class="sr-only">Order summary</caption>
+            <tbody>
+            @foreach (var line in pricing.Lines)
+            {
+                <tr>
+                    <td>
+                        @line.Title <span class="text-muted">&times; @line.Quantity</span>
+                        @if (line.IsOnSale)
+                        {
+                            <span class="sale-badge" title="@line.SaleName">Sale</span>
+                        }
+                    </td>
+                    <td class="text-right">@line.LineSubtotal.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="text-right">Subtotal</th>
+                    <th class="text-right">@pricing.Subtotal.ToString("C")</th>
+                </tr>
+                @if (pricing.DiscountApplied)
+                {
+                    <tr>
+                        <th class="text-right">Discount (@pricing.AppliedCode)</th>
+                        <th class="text-right text-success">-@pricing.DiscountAmount.ToString("C")</th>
+                    </tr>
+                }
+                <tr>
+                    <th class="text-right">Total</th>
+                    <th class="text-right">@pricing.Total.ToString("C")</th>
+                </tr>
+            </tfoot>
+        </table>
+        <p class="text-muted">
+            Have a discount code? @Html.ActionLink("Add it in your cart", "Index", "ShoppingCart") before placing your order.
+        </p>
+    </fieldset>
+
+    <fieldset class="form-horizontal">
         <legend>Payment</legend>
 
         @if (ViewBag.PaymentConfigured == true)
@@ -110,13 +153,13 @@
                 (Stripe) to complete your purchase. No card details are stored by this site.
             </p>
             <p class="text-muted">
-                Have a gift card or the <strong>FREE</strong> promo? Apply it below. A gift card pays down
-                your order total and the promo covers the rest; anything still owing is paid by card.
+                Have a gift card? Apply it below — it pays down your order total, and anything still
+                owing is paid by card.
             </p>
         }
         else
         {
-            <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>. You can also pay with a gift card.</p>
+            <p>You can pay with a gift card. Apply your gift card code below.</p>
         }
 
         <div class="form-group">
@@ -124,15 +167,7 @@
             <div class="col-md-6">
                 @Html.TextBox("GiftCardCode", ViewBag.GiftCardCode as string, new { @class = "form-control", placeholder = "GIFT-XXXX-XXXX-XXXX (optional)", autocomplete = "off" })
                 @Html.ValidationMessage("GiftCardCode", string.Empty, new { @class = "text-danger" })
-                <p class="help-block">A gift card pays down your order total.@(ViewBag.PaymentConfigured == true ? " Any remaining balance is paid by card." : " Any remainder needs promo code FREE.")</p>
-            </div>
-        </div>
-
-        <div class="form-group">
-            @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
-            <div class="col-md-6">
-                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code (optional)", autocomplete = "off" })
-                @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
+                <p class="help-block">A gift card pays down your order total.@(ViewBag.PaymentConfigured == true ? " Any remaining balance is paid by card." : "")</p>
             </div>
         </div>
     </fieldset>

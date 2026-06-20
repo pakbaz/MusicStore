@@ -1,0 +1,37 @@
+﻿@model MvcMusicStore.Models.DiscountCode
+
+@{
+    ViewBag.Title = "Delete Discount Code";
+}
+
+<h2>Delete discount code</h2>
+
+<p class="alert alert-warning">Are you sure you want to delete this discount code?</p>
+
+<dl class="dl-horizontal">
+    <dt>@Html.DisplayNameFor(m => m.Code)</dt>
+    <dd>@Model.Code</dd>
+
+    <dt>@Html.DisplayNameFor(m => m.Description)</dt>
+    <dd>@(string.IsNullOrEmpty(Model.Description) ? "—" : Model.Description)</dd>
+
+    <dt>@Html.DisplayNameFor(m => m.DiscountType)</dt>
+    <dd>@Model.DiscountType</dd>
+
+    <dt>@Html.DisplayNameFor(m => m.Value)</dt>
+    <dd>
+        @(Model.DiscountType == MvcMusicStore.Models.DiscountType.Percentage
+            ? $"{Model.Value:0.##}%"
+            : Model.Value.ToString("C"))
+    </dd>
+
+    <dt>@Html.DisplayNameFor(m => m.TimesUsed)</dt>
+    <dd>@Model.TimesUsed</dd>
+</dl>
+
+@using (Html.BeginForm("Delete", "DiscountCodes", new { id = Model.DiscountCodeId }, FormMethod.Post))
+{
+    @Html.AntiForgeryToken()
+    <input type="submit" value="Delete" class="btn btn-danger" />
+    @Html.ActionLink("Back to list", "Index", null, new { @class = "btn btn-link" })
+}
