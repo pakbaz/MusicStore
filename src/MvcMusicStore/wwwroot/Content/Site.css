@@ -1162,3 +1162,47 @@ input[type="checkbox"].input-validation-error {
 .ai-originality { color: var(--text-muted); font-style: italic; font-size: 13px; }
 .ai-result-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
 .ai-error-actions { margin-top: 10px; }
+
+/* Social share buttons (album details) */
+.share-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+}
+.share-label {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+.share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.share-btn:hover,
+.share-btn:focus {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    text-decoration: none;
+}
+.share-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+.share-copy {
+    font-family: inherit;
+}

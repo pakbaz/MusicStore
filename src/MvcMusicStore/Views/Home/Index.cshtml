@@ -1,7 +1,19 @@
 ﻿@model MvcMusicStore.ViewModels.HomeIndexViewModel
 
 @{
-    ViewBag.Title = "Home Page";
+    ViewBag.Title = "Home";
+
+    var siteUrl = Url.AbsoluteContent("~/");
+    var storeUrl = Url.Action("Index", "Store", null, Context.Request.Scheme) ?? siteUrl;
+    var searchTemplate = $"{storeUrl}?search={{search_term_string}}";
+    var logoUrl = Url.AbsoluteContent(Seo.LogoPath);
+
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = "Buy albums, preview tracks, and create AI music",
+        Description = Seo.DefaultDescription,
+        OgType = "website"
+    };
 }
 
 <section class="hero-panel" aria-label="Featured music">
@@ -29,7 +41,7 @@
     @foreach (var album in Model.FeaturedReleases)
     {
         <article class="album-card">
-            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                 <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                 <div class="album-card-body">
                     <h3 class="album-title">@album.Title</h3>
@@ -50,7 +62,7 @@
     @foreach (var album in Model.TrendingReleases)
     {
         <article class="album-card">
-            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                 <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                 <div class="album-card-body">
                     <h3 class="album-title">@album.Title</h3>
@@ -71,7 +83,7 @@
     @foreach (var album in Model.CuratedReleases)
     {
         <article class="album-card">
-            <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+            <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                 <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                 <div class="album-card-body">
                     <h3 class="album-title">@album.Title</h3>
@@ -82,3 +94,5 @@
     }
     </div>
 </section>
+
+@Html.Raw(StructuredData.HomeGraph(siteUrl, searchTemplate, logoUrl))
