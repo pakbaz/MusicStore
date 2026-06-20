@@ -65,6 +65,10 @@ var cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"];
 var cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? "musicstore";
 var cosmosUseEmulatorWorkarounds = builder.Configuration.GetValue("Cosmos:UseEmulatorWorkarounds", false);
 
+// Catalog id counters live in a dedicated Cosmos container; the context needs the database name
+// (not exposed by the EF provider) to reach it via the shared CosmosClient.
+builder.Services.AddSingleton(new CosmosCatalogOptions(cosmosDatabase));
+
 builder.Services.AddDbContext<MusicStoreEntities>(options =>
     ConfigureCosmos(options, cosmosConnectionString, cosmosEndpoint, cosmosDatabase, cosmosUseEmulatorWorkarounds, azureCredential));
 
@@ -195,6 +199,13 @@ static async Task SeedDatabaseAsync(WebApplication app)
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
 
+        // The atomic id-counter container is managed via the Cosmos SDK (not an EF entity), so create
+        // it explicitly. Partition key "/id" gives each counter its own logical partition.
+        var catalogOptions = services.GetRequiredService<CosmosCatalogOptions>();
+        await musicStoreDb.Database.GetCosmosClient()
+            .GetDatabase(catalogOptions.DatabaseName)
+            .CreateContainerIfNotExistsAsync(catalogOptions.CountersContainerName, "/id");
+
         var identityDb = services.GetRequiredService<ApplicationDbContext>();
         await identityDb.Database.EnsureCreatedAsync();
 
@@ -225,6 +236,10 @@ static async Task SeedDatabaseAsync(WebApplication app)
 
         // Seed music store data
         await SampleData.SeedAsync(musicStoreDb);
+
+        // Initialize id counters from the current max once, at startup, so id allocation never
+        // scans the catalog containers on the insert path.
+        await musicStoreDb.EnsureSequencesInitializedAsync();
     }
     catch (Exception ex)
     {
