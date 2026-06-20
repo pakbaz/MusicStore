@@ -63,6 +63,11 @@ namespace MvcMusicStore.ViewModels
         public string Availability { get; set; } = CatalogAvailabilityOptions.All;
         public string Sort { get; set; } = CatalogSortOptions.PopularityDesc;
         public int TotalResults { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 12;
+        public int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling(TotalResults / (double)PageSize);
+        public bool HasPreviousPage => Page > 1;
+        public bool HasNextPage => Page < TotalPages;
         public List<string> Genres { get; set; } = [];
         public List<CatalogAlbumItemViewModel> Albums { get; set; } = [];
     }

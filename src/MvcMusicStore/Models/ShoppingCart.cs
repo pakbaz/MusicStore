@@ -158,6 +158,14 @@ namespace MvcMusicStore.Models
                 orderTotal += (item.Count * item.AlbumPrice);
 
                 order.OrderDetails.Add(orderDetail);
+
+                // Maintain the denormalized popularity counter so the catalog can sort by
+                // popularity without scanning the Orders container on every request.
+                var album = await _db.Albums.SingleOrDefaultAsync(a => a.AlbumId == item.AlbumId);
+                if (album != null)
+                {
+                    album.Popularity += item.Count;
+                }
             }
 
             // Set the order's total to the orderTotal count

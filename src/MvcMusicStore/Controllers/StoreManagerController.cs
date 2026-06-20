@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
+using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
 {
@@ -18,6 +19,8 @@ namespace MvcMusicStore.Controllers
         private readonly IThumbnailCacheService thumbnailCacheService;
         private readonly IWebHostEnvironment environment;
         private readonly ILogger<StoreManagerController> logger;
+
+        private const int PageSize = 20;
 
         private static readonly HashSet<string> AllowedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -45,11 +48,38 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /StoreManager/
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1)
         {
-            var albums = await db.Albums.ToListAsync();
+            if (page < 1)
+            {
+                page = 1;
+            }
+
+            var totalResults = await db.Albums.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalResults / (double)PageSize);
+            if (totalPages > 0 && page > totalPages)
+            {
+                page = totalPages;
+            }
+
+            // Order and page in the query so the admin list does not materialize the whole
+            // Albums container. Cosmos default indexing supports single-property ORDER BY.
+            var albums = await db.Albums
+                .OrderBy(a => a.Price)
+                .Skip((page - 1) * PageSize)
+                .Take(PageSize)
+                .ToListAsync();
             albums.PopulateNavigation();
-            return View(albums.OrderBy(a => a.Price).ToList());
+
+            var viewModel = new StoreManagerIndexViewModel
+            {
+                Albums = albums,
+                Page = page,
+                PageSize = PageSize,
+                TotalResults = totalResults
+            };
+
+            return View(viewModel);
         }
 
         //
