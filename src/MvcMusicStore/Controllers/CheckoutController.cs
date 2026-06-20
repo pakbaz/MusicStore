@@ -13,11 +13,19 @@ namespace MvcMusicStore.Controllers
     {
         private readonly MusicStoreEntities storeDB;
         private readonly IPromotionService promotions;
+        private readonly IOrderEmailSender emailSender;
+        private readonly ILogger<CheckoutController> logger;
 
-        public CheckoutController(MusicStoreEntities storeDb, IPromotionService promotions)
+        public CheckoutController(
+            MusicStoreEntities storeDb,
+            IPromotionService promotions,
+            IOrderEmailSender emailSender,
+            ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             this.promotions = promotions;
+            this.emailSender = emailSender;
+            this.logger = logger;
         }
 
         //
@@ -63,6 +71,7 @@ namespace MvcMusicStore.Controllers
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
+            order.Status = "Paid";
 
             // Builds embedded order details at the charged (sale-adjusted) prices, records the
             // discount, sets the total, and empties the cart.
@@ -80,6 +89,16 @@ namespace MvcMusicStore.Controllers
 
             ClearSessionDiscountCode();
 
+            // Send the confirmation receipt. A delivery failure must never fail a placed order.
+            try
+            {
+                await emailSender.SendOrderConfirmationAsync(order);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
+            }
+
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
 
@@ -89,18 +108,17 @@ namespace MvcMusicStore.Controllers
         public async Task<IActionResult> Complete(int id)
         {
             // Validate customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS subquery),
-            // so materialize a single matching id with Take(1) instead.
-            IQueryable<Order> orders = storeDB.Orders;
-            var matchingOrder = await orders
+            // so materialize a single matching order with Take(1) instead. Owned OrderDetails are
+            // part of the same document, so they load with the order for the confirmation summary.
+            var matchingOrders = await storeDB.Orders
                 .Where(o => o.OrderId == id && o.Username == User.Identity!.Name)
-                .Select(o => o.OrderId)
                 .Take(1)
                 .ToListAsync();
-            bool isValid = matchingOrder.Count != 0;
+            var order = matchingOrders.FirstOrDefault();
 
-            if (isValid)
+            if (order != null)
             {
-                return View(id);
+                return View(order);
             }
 
             ViewBag.ErrorMessage = "We couldn't find that order for your account. Please review your recent orders or try checkout again.";

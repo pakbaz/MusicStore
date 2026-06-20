@@ -145,18 +145,37 @@ namespace MvcMusicStore.Models
         {
             order.OrderDetails ??= new List<OrderDetail>();
 
+            // Load the catalog albums backing the cart so each line can capture the album's
+            // current title, art, and audio (download) URL as a stable snapshot. Albums are
+            // fetched one id at a time, matching the Cosmos-safe query patterns used elsewhere.
+            var albumLookup = new Dictionary<int, Album>();
+            foreach (var albumId in pricing.Lines.Select(l => l.AlbumId).Distinct())
+            {
+                var album = await _db.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
+                if (album != null)
+                {
+                    albumLookup[albumId] = album;
+                }
+            }
+
             var orderDetailId = 1;
 
-            // Persist the sale-adjusted unit price each line was actually charged at.
+            // Persist the sale-adjusted unit price each line was actually charged at, plus a
+            // catalog snapshot (title, art, audio) so order history and receipts stay stable.
             foreach (var line in pricing.Lines)
             {
+                albumLookup.TryGetValue(line.AlbumId, out var album);
+
                 order.OrderDetails.Add(new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
                     AlbumId = line.AlbumId,
                     OrderId = order.OrderId,
                     UnitPrice = line.EffectiveUnitPrice,
-                    Quantity = line.Quantity
+                    Quantity = line.Quantity,
+                    AlbumTitle = album?.Title ?? line.Title,
+                    AlbumArtUrl = album?.GetDisplayThumbnailUrl(),
+                    AudioUrl = album?.AudioUrl,
                 });
             }
 
