@@ -58,6 +58,88 @@ namespace MvcMusicStore.Models
             }
         }
 
+        public async Task AddBundleToCartAsync(Bundle bundle)
+        {
+            var cartItem = await _db.Carts.SingleOrDefaultAsync(
+                c => c.CartId == ShoppingCartId
+                && c.BundleId == bundle.BundleId);
+
+            if (cartItem == null)
+            {
+                cartItem = new Cart
+                {
+                    RecordId = await _db.NextCartRecordIdAsync(),
+                    CartId = ShoppingCartId,
+                    AlbumId = 0,
+                    Count = 1,
+                    DateCreated = DateTime.Now,
+                    BundleId = bundle.BundleId,
+                    BundleTitle = bundle.Title,
+                    BundlePrice = bundle.BundlePrice,
+                    BundleItems = DistributeBundlePricing(bundle),
+                    AlbumArtUrl = bundle.GetDisplayThumbnailUrl()
+                };
+
+                _db.Carts.Add(cartItem);
+            }
+            else
+            {
+                cartItem.Count++;
+            }
+        }
+
+        // Spreads the bundle's discounted price across its member albums (proportional to each
+        // album's regular price) so the per-album unit prices sum exactly to the bundle price.
+        // Those unit prices are what we record as OrderDetails at checkout.
+        private static List<CartBundleItem> DistributeBundlePricing(Bundle bundle)
+        {
+            var items = bundle.Items ?? new List<BundleItem>();
+            var result = new List<CartBundleItem>();
+            if (items.Count == 0)
+            {
+                return result;
+            }
+
+            var regularTotal = items.Sum(item => item.AlbumPrice);
+            var bundlePrice = bundle.BundlePrice;
+            decimal allocated = 0m;
+
+            for (var index = 0; index < items.Count; index++)
+            {
+                var item = items[index];
+                decimal unitPrice;
+
+                if (index == items.Count - 1)
+                {
+                    // Last member absorbs the rounding remainder so the line sums to BundlePrice.
+                    unitPrice = bundlePrice - allocated;
+                }
+                else if (regularTotal > 0m)
+                {
+                    unitPrice = Math.Round(item.AlbumPrice / regularTotal * bundlePrice, 2, MidpointRounding.AwayFromZero);
+                }
+                else
+                {
+                    unitPrice = Math.Round(bundlePrice / items.Count, 2, MidpointRounding.AwayFromZero);
+                }
+
+                if (unitPrice < 0m)
+                {
+                    unitPrice = 0m;
+                }
+
+                allocated += unitPrice;
+                result.Add(new CartBundleItem
+                {
+                    AlbumId = item.AlbumId,
+                    AlbumTitle = item.AlbumTitle,
+                    UnitPrice = unitPrice
+                });
+            }
+
+            return result;
+        }
+
         public async Task<int> RemoveFromCartAsync(int id)
         {
             // Get the cart
@@ -130,7 +212,7 @@ namespace MvcMusicStore.Models
         public async Task<decimal> GetTotalAsync()
         {
             var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
-            return cartItems.Sum(item => item.Count * item.AlbumPrice);
+            return cartItems.Sum(item => item.Count * item.LineUnitPrice);
         }
 
         public async Task<int> CreateOrderAsync(Order order)
@@ -145,6 +227,27 @@ namespace MvcMusicStore.Models
             // Iterate over the items in the cart, adding the order details for each
             foreach (var item in cartItems)
             {
+                if (item.IsBundle)
+                {
+                    // Expand the bundle into one order detail per member album at the distributed
+                    // (discounted) unit price, so the order total matches the discounted cart line.
+                    foreach (var member in item.BundleItems ?? new List<CartBundleItem>())
+                    {
+                        order.OrderDetails.Add(new OrderDetail
+                        {
+                            OrderDetailId = orderDetailId++,
+                            AlbumId = member.AlbumId,
+                            OrderId = order.OrderId,
+                            UnitPrice = member.UnitPrice,
+                            Quantity = item.Count,
+                        });
+
+                        orderTotal += member.UnitPrice * item.Count;
+                    }
+
+                    continue;
+                }
+
                 var orderDetail = new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,

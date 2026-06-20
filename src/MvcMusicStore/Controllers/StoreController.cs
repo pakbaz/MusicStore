@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
@@ -8,10 +9,17 @@ namespace MvcMusicStore.Controllers
     public class StoreController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IRecommendationService recommendationService;
+        private readonly IBundleService bundleService;
 
-        public StoreController(MusicStoreEntities storeDb)
+        public StoreController(
+            MusicStoreEntities storeDb,
+            IRecommendationService recommendationService,
+            IBundleService bundleService)
         {
             storeDB = storeDb;
+            this.recommendationService = recommendationService;
+            this.bundleService = bundleService;
         }
 
         //
@@ -158,11 +166,16 @@ namespace MvcMusicStore.Controllers
                 .ToList();
             moreFromArtist.PopulateNavigation();
 
+            var alsoBought = (await recommendationService.GetAlsoBoughtAsync(id)).ToList();
+            var bundles = (await bundleService.GetBundlesContainingAlbumAsync(id)).ToList();
+
             var viewModel = new AlbumDetailsViewModel
             {
                 Album = album,
                 RelatedByGenre = relatedByGenre,
-                MoreFromArtist = moreFromArtist
+                MoreFromArtist = moreFromArtist,
+                AlsoBought = alsoBought,
+                Bundles = bundles
             };
 
             return View(viewModel);

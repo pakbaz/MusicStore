@@ -14,6 +14,7 @@ namespace MvcMusicStore.Models
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<Bundle>    Bundles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -46,6 +47,14 @@ namespace MvcMusicStore.Models
                 b.ToContainer("Carts");
                 b.HasKey(c => c.RecordId);
                 b.Ignore(c => c.Album);
+                b.OwnsMany(c => c.BundleItems);
+            });
+
+            modelBuilder.Entity<Bundle>(b =>
+            {
+                b.ToContainer("Bundles");
+                b.HasKey(x => x.BundleId);
+                b.OwnsMany(x => x.Items);
             });
 
             modelBuilder.Entity<Order>(b =>
@@ -96,6 +105,12 @@ namespace MvcMusicStore.Models
         public async Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextBundleIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await Bundles.Select(b => b.BundleId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 1 : ids.Max() + 1;
         }
     }

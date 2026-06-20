@@ -117,6 +117,10 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
+// Cross-sell / upsell recommendations and admin-defined album bundles.
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+builder.Services.AddScoped<IBundleService, BundleService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
