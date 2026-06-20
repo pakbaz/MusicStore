@@ -65,6 +65,18 @@ namespace MvcMusicStore.Models
         [StringLength(1024)]
         public string? AudioUrl { get; set; }
 
+        [DisplayName("Preview Audio URL")]
+        [StringLength(1024)]
+        public string? PreviewUrl { get; set; }
+
+        [DisplayName("Preview Length (seconds)")]
+        [Range(5, 60)]
+        public int PreviewDurationSeconds { get; set; } = DefaultPreviewDurationSeconds;
+
+        public const int DefaultPreviewDurationSeconds = 30;
+
+        public bool HasPreview => !string.IsNullOrWhiteSpace(PreviewUrl);
+
         [DisplayName("Metadata Thumbnail URL")]
         [StringLength(1024)]
         public string? MetadataThumbnailUrl { get; set; }
@@ -101,6 +113,11 @@ namespace MvcMusicStore.Models
 
         [DisplayName("Available")]
         public bool IsAvailable { get; set; } = true;
+
+        // Denormalized cumulative units sold, maintained at checkout so the catalog can sort by
+        // popularity without scanning the Orders container on every request.
+        [ScaffoldColumn(false)]
+        public int Popularity { get; set; }
 
         public virtual Genre? Genre { get; set; }
         public virtual Artist? Artist { get; set; }

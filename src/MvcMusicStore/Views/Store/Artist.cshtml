@@ -1,7 +1,30 @@
 ﻿@model MvcMusicStore.ViewModels.ArtistDetailsViewModel
 
 @{
-    ViewBag.Title = "Artist - " + Model.Artist.Name;
+    var artist = Model.Artist;
+    ViewBag.Title = artist.Name;
+
+    var genres = Model.Albums.Select(a => a.Genre?.Name ?? a.GenreName);
+    var canonicalUrl = Url.ArtistUrl(artist.ArtistId, artist.Name, absolute: true);
+    var firstAlbum = Model.Albums.FirstOrDefault();
+    var imageUrl = firstAlbum != null
+        ? Url.AbsoluteAlbumImage(firstAlbum)
+        : Url.AbsoluteContent(Seo.DefaultSocialImagePath);
+
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = artist.Name,
+        Description = Seo.ArtistDescription(artist.Name, Model.Albums.Count, genres),
+        CanonicalUrl = canonicalUrl,
+        ImageUrl = imageUrl,
+        ImageAlt = $"{artist.Name} on {Seo.SiteName}",
+        OgType = "profile"
+    };
+
+    var albumNodes = Model.Albums.Select(a => (
+        Name: a.Title ?? string.Empty,
+        Url: Url.AlbumUrl(a.AlbumId, a.Title, absolute: true),
+        Image: (string?)Url.AbsoluteAlbumImage(a)));
 }
 
 <h2>@Model.Artist.Name</h2>
@@ -18,7 +41,7 @@
             @foreach (var album in Model.Albums)
             {
                 <li class="col-lg-2 col-md-3 col-sm-4 col-xs-6 container">
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                         <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h5>@album.Title</h5>
                     </a>
@@ -41,7 +64,7 @@
             @foreach (var album in Model.RelatedAlbums)
             {
                 <li class="col-md-3 col-sm-4 col-xs-6 container">
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                         <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h5>@album.Title</h5>
                     </a>
@@ -51,3 +74,5 @@
         </ul>
     }
 </section>
+
+@Html.Raw(StructuredData.MusicGroup(artist.Name, canonicalUrl, imageUrl, albumNodes))

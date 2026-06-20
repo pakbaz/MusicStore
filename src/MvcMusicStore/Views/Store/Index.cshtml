@@ -1,6 +1,13 @@
 ﻿@model MvcMusicStore.ViewModels.CatalogIndexViewModel
 @{
-    ViewBag.Title = "Store Catalog";
+    ViewBag.Title = "Catalog";
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = "Browse the music catalog",
+        Description = "Browse and buy albums across genres on MVC Music Store. " +
+            "Filter by genre, price, and availability, preview tracks, and add favorites to your cart.",
+        OgType = "website"
+    };
 }
 
 <section class="content-section" aria-label="Store catalog filters">
@@ -69,7 +76,7 @@
             @foreach (var album in Model.Albums)
             {
                 <li>
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                         <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h2 class="h5">@album.Title</h2>
                     </a>
@@ -84,8 +91,33 @@
                     {
                         <span class="label label-default">Out of stock</span>
                     }
+                    @if (album.HasPreview)
+                    {
+                        @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                        {
+                            PreviewUrl = album.PreviewUrl!,
+                            DurationSeconds = album.PreviewDurationSeconds,
+                            Title = album.Title,
+                            Variant = "card"
+                        })
+                    }
                 </li>
             }
         </ul>
+    }
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="catalog-pagination" aria-label="Catalog pagination">
+            @if (Model.HasPreviousPage)
+            {
+                <a class="btn btn-default" rel="prev" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page - 1 })">Previous</a>
+            }
+            <span class="text-muted">Page @Model.Page of @Model.TotalPages</span>
+            @if (Model.HasNextPage)
+            {
+                <a class="btn btn-default" rel="next" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page + 1 })">Next</a>
+            }
+        </nav>
     }
 </section>

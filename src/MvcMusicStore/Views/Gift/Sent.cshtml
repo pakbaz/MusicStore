@@ -1,0 +1,44 @@
+@model MvcMusicStore.Models.AlbumGift
+@{
+    ViewBag.Title = "Gift Sent";
+    var redeemUrl = ViewBag.RedeemUrl as string;
+}
+
+<h2>Gift Sent</h2>
+
+<div class="alert alert-success">
+    <strong>@Model.AlbumTitle</strong> is on its way to <strong>@Model.RecipientEmail</strong>.
+</div>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <dl class="dl-horizontal">
+            <dt>Album</dt>
+            <dd>@Model.AlbumTitle</dd>
+            <dt>Recipient</dt>
+            <dd>@(string.IsNullOrWhiteSpace(Model.RecipientName) ? Model.RecipientEmail : $"{Model.RecipientName} ({Model.RecipientEmail})")</dd>
+            @if (!string.IsNullOrWhiteSpace(Model.Message))
+            {
+                <dt>Message</dt>
+                <dd>@Model.Message</dd>
+            }
+        </dl>
+
+        <p class="gift-card-code-label">Redeem link</p>
+        @if (!string.IsNullOrEmpty(redeemUrl))
+        {
+            <p><a href="@redeemUrl">@redeemUrl</a></p>
+        }
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <span class="glyphicon glyphicon-envelope" aria-hidden="true"></span>
+    A redeemable link has been emailed to the recipient.
+    (This sample logs emails instead of sending them, so the link is shown here for your reference.)
+</div>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Browse more music</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
+</p>
