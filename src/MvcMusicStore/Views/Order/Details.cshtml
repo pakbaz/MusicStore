@@ -1,8 +1,8 @@
 ﻿@model MvcMusicStore.Models.Order
+@using MvcMusicStore.Models
 
 @{
     ViewBag.Title = "Order #" + Model.OrderId;
-    var status = string.IsNullOrWhiteSpace(Model.Status) ? "Paid" : Model.Status;
     var details = Model.OrderDetails ?? new List<MvcMusicStore.Models.OrderDetail>();
     var itemCount = details.Sum(d => d.Quantity);
 }
@@ -19,9 +19,17 @@
         &middot; @itemCount @(itemCount == 1 ? "item" : "items")
     </p>
     <p>
-        <span class="label label-success">Payment: @status</span>
+        Payment: @await Html.PartialAsync("_PaymentStatusBadge", Model.PaymentStatus)
+        @if (!string.IsNullOrWhiteSpace(Model.PaymentProvider))
+        {
+            <span class="text-muted">via @Model.PaymentProvider</span>
+        }
         <span class="label label-info">Fulfillment: Digital</span>
     </p>
+    @if (Model.PaidDate.HasValue)
+    {
+        <p class="text-muted">Paid on @Model.PaidDate.Value.ToString("f")</p>
+    }
 </div>
 
 <div class="row">

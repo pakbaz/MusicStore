@@ -1,4 +1,5 @@
 ﻿@model IReadOnlyList<MvcMusicStore.Models.Order>
+@using MvcMusicStore.Models
 
 @{
     ViewBag.Title = "My Orders";
@@ -34,13 +35,12 @@ else
             @foreach (var order in Model)
             {
                 var itemCount = order.OrderDetails?.Sum(d => d.Quantity) ?? 0;
-                var status = string.IsNullOrWhiteSpace(order.Status) ? "Paid" : order.Status;
                 <tr>
                     <td>@order.OrderId</td>
                     <td>@order.OrderDate.ToString("g")</td>
                     <td>@itemCount @(itemCount == 1 ? "item" : "items")</td>
                     <td class="text-right">@order.Total.ToString("C")</td>
-                    <td><span class="label label-success">@status</span></td>
+                    <td>@await Html.PartialAsync("_PaymentStatusBadge", order.PaymentStatus)</td>
                     <td>
                         <a class="btn btn-default btn-sm" href="@Url.Action("Details", "Order", new { id = order.OrderId })" aria-label="View details for order @order.OrderId">View details</a>
                     </td>

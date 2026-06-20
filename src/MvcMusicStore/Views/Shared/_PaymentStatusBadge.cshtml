@@ -1,0 +1,13 @@
+﻿@model MvcMusicStore.Models.PaymentStatus
+@{
+    var (css, text) = Model switch
+    {
+        MvcMusicStore.Models.PaymentStatus.Paid => ("label-success", "Paid"),
+        MvcMusicStore.Models.PaymentStatus.Pending => ("label-warning", "Pending"),
+        MvcMusicStore.Models.PaymentStatus.Failed => ("label-danger", "Failed"),
+        MvcMusicStore.Models.PaymentStatus.Cancelled => ("label-default", "Cancelled"),
+        MvcMusicStore.Models.PaymentStatus.Refunded => ("label-info", "Refunded"),
+        _ => ("label-default", Model.ToString())
+    };
+}
+<span class="label @css">@text</span>
