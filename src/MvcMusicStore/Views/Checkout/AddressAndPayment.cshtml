@@ -92,14 +92,29 @@
 
     <fieldset class="form-horizontal">
         <legend>Payment</legend>
-        <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>. You can also pay with a gift card.</p>
+
+        @if (ViewBag.PaymentConfigured == true)
+        {
+            <p>
+                Pay securely by card — when you submit, you'll be redirected to our payment provider
+                (Stripe) to complete your purchase. No card details are stored by this site.
+            </p>
+            <p class="text-muted">
+                Have a gift card or the <strong>FREE</strong> promo? Apply it below. A gift card pays down
+                your order total and the promo covers the rest; anything still owing is paid by card.
+            </p>
+        }
+        else
+        {
+            <p>We're running a promotion: all music is free with promo code <strong>FREE</strong>. You can also pay with a gift card.</p>
+        }
 
         <div class="form-group">
             @Html.Label("GiftCardCode", "Gift Card Code", new { @class = "control-label col-md-2" })
             <div class="col-md-6">
                 @Html.TextBox("GiftCardCode", ViewBag.GiftCardCode as string, new { @class = "form-control", placeholder = "GIFT-XXXX-XXXX-XXXX (optional)", autocomplete = "off" })
                 @Html.ValidationMessage("GiftCardCode", string.Empty, new { @class = "text-danger" })
-                <p class="help-block">A gift card pays down your order total. Any remainder needs promo code <strong>FREE</strong>.</p>
+                <p class="help-block">A gift card pays down your order total.@(ViewBag.PaymentConfigured == true ? " Any remaining balance is paid by card." : " Any remainder needs promo code FREE.")</p>
             </div>
         </div>
 
@@ -158,7 +173,7 @@
     </fieldset>
 
     <p>
-        <input class="btn btn-primary" type="submit" value="Submit Order" />
+        <input class="btn btn-primary" type="submit" value="@(ViewBag.PaymentConfigured == true ? "Continue to payment" : "Submit Order")" />
         <a class="btn btn-default" href="@Url.Action("Index", "ShoppingCart")">Back to cart</a>
     </p>
 }

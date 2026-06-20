@@ -1,4 +1,4 @@
-﻿@model MvcMusicStore.ViewModels.StoreManagerIndexViewModel
+@model MvcMusicStore.ViewModels.StoreManagerIndexViewModel
 
 @functions {
     string Truncate(string? input, int length)
@@ -17,6 +17,8 @@
 
 <p>
     @Html.ActionLink("Create New", "Create")
+    &nbsp;|&nbsp;
+    @Html.ActionLink("Manage Orders", "Orders")
     &nbsp;|&nbsp;
     @Html.ActionLink("Manage reviews", "Reviews")
 </p>

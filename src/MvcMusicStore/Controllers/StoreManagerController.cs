@@ -24,6 +24,7 @@ namespace MvcMusicStore.Controllers
         private readonly BlobServiceClient blobServiceClient;
         private readonly StorageOptions storageOptions;
         private readonly ILogger<StoreManagerController> logger;
+        private readonly IPaymentService paymentService;
 
         private const int PageSize = 20;
 
@@ -65,7 +66,8 @@ namespace MvcMusicStore.Controllers
             IWebHostEnvironment environment,
             BlobServiceClient blobServiceClient,
             IOptions<StorageOptions> storageOptions,
-            ILogger<StoreManagerController> logger)
+            ILogger<StoreManagerController> logger,
+            IPaymentService paymentService)
         {
             db = storeDb;
             this.albumArtworkService = albumArtworkService;
@@ -74,6 +76,7 @@ namespace MvcMusicStore.Controllers
             this.blobServiceClient = blobServiceClient;
             this.storageOptions = storageOptions.Value;
             this.logger = logger;
+            this.paymentService = paymentService;
         }
 
         //
@@ -532,6 +535,53 @@ namespace MvcMusicStore.Controllers
                 logger.LogWarning(ex, "Timed out while fetching metadata artwork for album '{AlbumTitle}' by '{ArtistName}'.", albumTitle, artistName);
                 return null;
             }
+        }
+
+        //
+        // GET: /StoreManager/Orders
+
+        public async Task<IActionResult> Orders()
+        {
+            var orders = await db.Orders.ToListAsync();
+            return View(orders.OrderByDescending(o => o.OrderDate).ToList());
+        }
+
+        //
+        // POST: /StoreManager/RefundOrder
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RefundOrder(int id)
+        {
+            var order = (await db.Orders.Where(o => o.OrderId == id).Take(1).ToListAsync()).FirstOrDefault();
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            if (order.PaymentStatus != PaymentStatus.Paid)
+            {
+                TempData["OrderError"] = $"Order {id} can't be refunded because it isn't in a paid state.";
+                return RedirectToAction(nameof(Orders));
+            }
+
+            // Only call the provider for real (Stripe) payments; promo/FREE orders are reversed locally.
+            if (string.Equals(order.PaymentProvider, "Stripe", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(order.PaymentIntentId))
+            {
+                var result = await paymentService.RefundAsync(order.PaymentIntentId);
+                if (!result.Success)
+                {
+                    TempData["OrderError"] = $"Refund failed for order {id}: {result.Error}";
+                    return RedirectToAction(nameof(Orders));
+                }
+            }
+
+            order.PaymentStatus = PaymentStatus.Refunded;
+            await db.SaveChangesAsync();
+
+            TempData["OrderMessage"] = $"Order {id} has been refunded.";
+            return RedirectToAction(nameof(Orders));
         }
     }
 }

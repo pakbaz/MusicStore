@@ -29,6 +29,12 @@ builder.Services.Configure<StorageOptions>(
 builder.Services.Configure<MusicGenOptions>(
     builder.Configuration.GetSection(MusicGenOptions.SectionName));
 
+// Stripe payment provider (Checkout hosted redirect). Secrets (SecretKey, WebhookSecret) come
+// from user-secrets / environment / Key Vault, never appsettings.
+builder.Services.Configure<StripeOptions>(
+    builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddSingleton<IPaymentService, StripePaymentService>();
+
 // Loyalty rewards + referral program.
 builder.Services.Configure<LoyaltyOptions>(
     builder.Configuration.GetSection(LoyaltyOptions.SectionName));
