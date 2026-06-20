@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
-using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
 {
@@ -15,16 +14,19 @@ namespace MvcMusicStore.Controllers
     {
         private readonly MusicStoreEntities storeDB;
         private readonly IPaymentService paymentService;
+        private readonly IOrderEmailSender emailSender;
         private readonly ILogger<CheckoutController> logger;
         const string PromoCode = "FREE";
 
         public CheckoutController(
             MusicStoreEntities storeDb,
             IPaymentService paymentService,
+            IOrderEmailSender emailSender,
             ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             this.paymentService = paymentService;
+            this.emailSender = emailSender;
             this.logger = logger;
         }
 
@@ -88,6 +90,8 @@ namespace MvcMusicStore.Controllers
 
                 storeDB.Orders.Add(order);
                 await storeDB.SaveChangesAsync();
+
+                await SendReceiptSafelyAsync(order);
 
                 return RedirectToAction("Complete", new { id = order.OrderId });
             }
@@ -171,6 +175,8 @@ namespace MvcMusicStore.Controllers
                         await cart.EmptyCartAsync();
 
                         await storeDB.SaveChangesAsync();
+
+                        await SendReceiptSafelyAsync(order);
                     }
                     else if (status.Status is PaymentStatus.Cancelled or PaymentStatus.Failed)
                     {
@@ -184,13 +190,7 @@ namespace MvcMusicStore.Controllers
                 }
             }
 
-            return View(new OrderConfirmationViewModel
-            {
-                OrderId = order.OrderId,
-                PaymentStatus = order.PaymentStatus,
-                PaymentProvider = order.PaymentProvider,
-                Total = order.Total,
-            });
+            return View(order);
         }
 
         //
@@ -263,6 +263,7 @@ namespace MvcMusicStore.Controllers
                     if (!string.IsNullOrWhiteSpace(order.Username))
                         await new ShoppingCart(storeDB).EmptyCartForUserAsync(order.Username);
                     await storeDB.SaveChangesAsync();
+                    await SendReceiptSafelyAsync(order);
                     break;
 
                 case PaymentStatus.Failed when order.PaymentStatus == PaymentStatus.Pending:
@@ -290,6 +291,20 @@ namespace MvcMusicStore.Controllers
 
             // Cosmos can't translate AnyAsync/FirstOrDefaultAsync predicates here; materialize Take(1).
             return (await query.Take(1).ToListAsync()).FirstOrDefault();
+        }
+
+        // Sends the confirmation receipt once an order is paid. A delivery failure must never
+        // surface to the shopper or roll back a captured payment, so failures are only logged.
+        private async Task SendReceiptSafelyAsync(Order order)
+        {
+            try
+            {
+                await emailSender.SendOrderConfirmationAsync(order);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
+            }
         }
     }
 }

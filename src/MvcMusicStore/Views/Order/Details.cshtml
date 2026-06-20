@@ -1,0 +1,115 @@
+﻿@model MvcMusicStore.Models.Order
+@using MvcMusicStore.Models
+
+@{
+    ViewBag.Title = "Order #" + Model.OrderId;
+    var details = Model.OrderDetails ?? new List<MvcMusicStore.Models.OrderDetail>();
+    var itemCount = details.Sum(d => d.Quantity);
+}
+
+<p>
+    <a class="btn btn-link" href="@Url.Action("Index", "Order")">&larr; Back to My Orders</a>
+</p>
+
+<h2>Order #@Model.OrderId</h2>
+
+<div class="order-meta">
+    <p>
+        Placed @Model.OrderDate.ToString("f")
+        &middot; @itemCount @(itemCount == 1 ? "item" : "items")
+    </p>
+    <p>
+        Payment: @await Html.PartialAsync("_PaymentStatusBadge", Model.PaymentStatus)
+        @if (!string.IsNullOrWhiteSpace(Model.PaymentProvider))
+        {
+            <span class="text-muted">via @Model.PaymentProvider</span>
+        }
+        <span class="label label-info">Fulfillment: Digital</span>
+    </p>
+    @if (Model.PaidDate.HasValue)
+    {
+        <p class="text-muted">Paid on @Model.PaidDate.Value.ToString("f")</p>
+    }
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Shipping &amp; contact</h3>
+        <address>
+            <strong>@Model.FirstName @Model.LastName</strong><br />
+            @Model.Address<br />
+            @Model.City, @Model.State @Model.PostalCode<br />
+            @Model.Country<br />
+            @if (!string.IsNullOrWhiteSpace(Model.Phone))
+            {
+                <span>@Model.Phone<br /></span>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Email))
+            {
+                <a href="mailto:@Model.Email">@Model.Email</a>
+            }
+        </address>
+    </div>
+</div>
+
+<h3>Items</h3>
+
+<table class="table table-striped table-bordered">
+    <caption class="sr-only">Items in order @Model.OrderId</caption>
+    <thead>
+        <tr>
+            <th scope="col" colspan="2">Album</th>
+            <th scope="col" class="text-right">Unit price</th>
+            <th scope="col" class="text-center">Qty</th>
+            <th scope="col" class="text-right">Subtotal</th>
+            <th scope="col">Download</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var detail in details)
+        {
+            var title = string.IsNullOrWhiteSpace(detail.AlbumTitle) ? "Album #" + detail.AlbumId : detail.AlbumTitle;
+            var artUrl = string.IsNullOrWhiteSpace(detail.AlbumArtUrl) ? MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl : detail.AlbumArtUrl;
+            var lineSubtotal = detail.UnitPrice * detail.Quantity;
+            <tr>
+                <td style="width:64px;">
+                    <img src="@Url.Content(artUrl)"
+                         alt="@title"
+                         data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)"
+                         style="width:48px;height:48px;object-fit:cover;border-radius:4px;" />
+                </td>
+                <td>
+                    @Html.ActionLink(title, "Details", "Store", new { id = detail.AlbumId }, null)
+                </td>
+                <td class="text-right">@detail.UnitPrice.ToString("C")</td>
+                <td class="text-center">@detail.Quantity</td>
+                <td class="text-right">@lineSubtotal.ToString("C")</td>
+                <td>
+                    @if (!string.IsNullOrWhiteSpace(detail.AudioUrl))
+                    {
+                        <a class="btn btn-default btn-sm" href="@Url.Content(detail.AudioUrl)" download aria-label="Download @title">
+                            <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span>
+                            Download
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">No download available</span>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <th colspan="4" class="text-right">Total</th>
+            <th class="text-right">@Model.Total.ToString("C")</th>
+            <th></th>
+        </tr>
+    </tfoot>
+</table>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Continue shopping</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Order")">My orders</a>
+</p>

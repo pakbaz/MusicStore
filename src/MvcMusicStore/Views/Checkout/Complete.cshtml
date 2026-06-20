@@ -1,4 +1,4 @@
-﻿@model MvcMusicStore.ViewModels.OrderConfirmationViewModel
+﻿@model MvcMusicStore.Models.Order
 @using MvcMusicStore.Models
 
 @{
@@ -15,7 +15,7 @@
         </div>
         <p>
             Payment received@(string.IsNullOrEmpty(Model.PaymentProvider) ? "" : $" via {Model.PaymentProvider}").
-            Your cart has been cleared.
+            Your cart has been cleared and a receipt has been sent to @(string.IsNullOrWhiteSpace(Model.Email) ? "your account email" : Model.Email).
         </p>
         break;
     case PaymentStatus.Pending:
@@ -25,7 +25,7 @@
         <p>
             We're still waiting for your payment to be confirmed. This usually only takes a moment — the
             status will update automatically. You can also check
-            <a href="@Url.Action("Index", "Orders")">your orders</a>.
+            <a href="@Url.Action("Index", "Order")">your orders</a>.
         </p>
         break;
     case PaymentStatus.Failed:
@@ -45,13 +45,41 @@
         break;
 }
 
-@if (Model.Total > 0)
-{
-    <p><strong>Order total:</strong> @Model.Total.ToString("C")</p>
-}
+<h3>Order summary</h3>
+
+<table class="table table-striped table-bordered">
+    <caption class="sr-only">Items in your order</caption>
+    <thead>
+        <tr>
+            <th scope="col">Album</th>
+            <th scope="col" class="text-right">Unit price</th>
+            <th scope="col">Quantity</th>
+            <th scope="col" class="text-right">Subtotal</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var detail in Model.OrderDetails ?? new List<MvcMusicStore.Models.OrderDetail>())
+        {
+            var albumName = string.IsNullOrEmpty(detail.AlbumTitle) ? $"Album #{detail.AlbumId}" : detail.AlbumTitle;
+            var lineSubtotal = detail.UnitPrice * detail.Quantity;
+            <tr>
+                <td>@Html.ActionLink(albumName, "Details", "Store", new { id = detail.AlbumId }, null)</td>
+                <td class="text-right">@detail.UnitPrice.ToString("C")</td>
+                <td>@detail.Quantity</td>
+                <td class="text-right">@lineSubtotal.ToString("C")</td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <th colspan="3" class="text-right">Total</th>
+            <th class="text-right">@Model.Total.ToString("C")</th>
+        </tr>
+    </tfoot>
+</table>
 
 <p>
-    <a class="btn btn-primary" href="@Url.Action("Index", "Store")">Continue shopping</a>
-    <a class="btn btn-default" href="@Url.Action("Index", "Orders")">My orders</a>
-    <a class="btn btn-default" href="@Url.Action("Index", "Home")">Return home</a>
+    <a class="btn btn-primary" href="@Url.Action("Details", "Order", new { id = Model.OrderId })">View order details</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Order")">My orders</a>
+    <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
 </p>
