@@ -1,0 +1,116 @@
+﻿@model MvcMusicStore.ViewModels.WishlistViewModel
+@{
+    ViewBag.Title = "Wishlist";
+    var hasItems = Model.WishlistItems != null && Model.WishlistItems.Count > 0;
+}
+
+@section Scripts {
+    <script type="text/javascript">
+        $(function () {
+            var removeUrl = '@Url.Action("RemoveFromWishlist", "Wishlist")';
+            var moveUrl = '@Url.Action("MoveToCart", "Wishlist")';
+
+            function updateWishlistBadge(count) {
+                $('#wishlist-summary-count').text(count);
+                if (count > 0) {
+                    $('#wishlist-summary-item').removeClass('hidden');
+                } else {
+                    $('#wishlist-summary-item').addClass('hidden');
+                }
+            }
+
+            function updateCartBadge(count, summary) {
+                $('#cart-summary-count').text(count);
+                $('#cart-summary-link').attr('title', summary || 'Your cart is empty');
+                if (count > 0) {
+                    $('#cart-summary-item').removeClass('hidden');
+                } else {
+                    $('#cart-summary-item').addClass('hidden');
+                }
+            }
+
+            function handleWishlistUpdate(data) {
+                var row = $('#wishlist-row-' + data.ItemId);
+                row.fadeOut('fast', function () {
+                    row.remove();
+                    if ($('#wishlist-list .wishlist-row').length === 0) {
+                        $('#wishlist-list-wrapper').addClass('hidden');
+                        $('#empty-wishlist-state').removeClass('hidden');
+                    }
+                });
+
+                updateWishlistBadge(data.WishlistCount);
+                updateCartBadge(data.CartCount, data.CartSummary);
+                $('#wishlist-message').removeClass('hidden').text(data.Message);
+            }
+
+            function postWishlistAction(url, recordId, fallbackMessage) {
+                $.post(url, { id: recordId })
+                    .done(handleWishlistUpdate)
+                    .fail(function (xhr) {
+                        var errorMessage = xhr.responseText || fallbackMessage;
+                        $('#wishlist-message').removeClass('hidden').text(errorMessage);
+                    });
+            }
+
+            $('.js-move').click(function (event) {
+                event.preventDefault();
+                postWishlistAction(moveUrl, $(this).data('id'), 'Sorry, we could not move that item to your cart.');
+            });
+
+            $('.js-remove-wishlist').click(function (event) {
+                event.preventDefault();
+                postWishlistAction(removeUrl, $(this).data('id'), 'Sorry, we could not remove that item.');
+            });
+        });
+    </script>
+}
+
+<h3><em>Your</em> wishlist</h3>
+
+@if (ViewBag.WishlistMessage != null)
+{
+    <div class="alert alert-info">@ViewBag.WishlistMessage</div>
+}
+
+<div id="wishlist-message" class="alert alert-info hidden" role="status" aria-live="polite"></div>
+
+<div id="empty-wishlist-state" class="@(hasItems ? "hidden" : string.Empty)">
+    <div class="jumbotron">
+        <h2>Your wishlist is empty</h2>
+        <p>Save albums you love for later, then move them to your cart when you are ready.</p>
+        <p>
+            <a class="btn btn-primary btn-lg" href="@Url.Action("Index", "Store")">Browse music</a>
+        </p>
+    </div>
+</div>
+
+<div id="wishlist-list-wrapper" class="@(hasItems ? string.Empty : "hidden")">
+    <p>
+        <a class="btn btn-default" href="@Url.Action("Index", "Store")">Continue shopping</a>
+    </p>
+
+    <ul id="wishlist-list" class="list-unstyled wishlist-list">
+        @foreach (var item in Model.WishlistItems ?? new List<MvcMusicStore.Models.WishlistItem>())
+        {
+            <li id="wishlist-row-@item.RecordId" class="wishlist-row">
+                <a class="wishlist-row-art" href="@Url.Action("Details", "Store", new { id = item.AlbumId })">
+                    <img alt="@item.Album!.Title" src="@Url.Content(item.Album!.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                </a>
+                <div class="wishlist-row-info">
+                    <h3 class="wishlist-row-title">
+                        @Html.ActionLink(item.Album!.Title, "Details", "Store", new { id = item.AlbumId }, null)
+                    </h3>
+                    <p class="wishlist-row-price">@item.Album!.Price.ToString("C")</p>
+                </div>
+                <div class="wishlist-row-actions">
+                    <button type="button" class="btn btn-primary js-move" data-id="@item.RecordId" aria-label="Move @item.Album!.Title to cart">
+                        <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
+                        Move to cart
+                    </button>
+                    <button type="button" class="btn btn-link js-remove-wishlist" data-id="@item.RecordId" aria-label="Remove @item.Album!.Title from wishlist">Remove</button>
+                </div>
+            </li>
+        }
+    </ul>
+</div>

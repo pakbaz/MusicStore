@@ -13,6 +13,7 @@ namespace MvcMusicStore.Models
         public DbSet<Genre>     Genres { get; set; }
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
+        public DbSet<WishlistItem> WishlistItems { get; set; }
         public DbSet<Order>     Orders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -46,6 +47,13 @@ namespace MvcMusicStore.Models
                 b.ToContainer("Carts");
                 b.HasKey(c => c.RecordId);
                 b.Ignore(c => c.Album);
+            });
+
+            modelBuilder.Entity<WishlistItem>(b =>
+            {
+                b.ToContainer("Wishlists");
+                b.HasKey(w => w.RecordId);
+                b.Ignore(w => w.Album);
             });
 
             modelBuilder.Entity<Order>(b =>
@@ -96,6 +104,12 @@ namespace MvcMusicStore.Models
         public async Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextWishlistRecordIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await WishlistItems.Select(w => w.RecordId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 1 : ids.Max() + 1;
         }
     }

@@ -22,6 +22,7 @@
                 <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
                 Add to cart
             </a>
+            @await Component.InvokeAsync("WishlistButton", new { albumId = Model.Album.AlbumId, large = true })
             <a class="btn btn-default btn-lg" href="@Url.Action("Browse", "Store", new { genre = Model.Album.Genre.Name })">
                 Back to @Model.Album.Genre.Name
             </a>
@@ -50,6 +51,9 @@
                         <p class="album-price">@album.Artist?.Name</p>
                     </div>
                 </a>
+                <div class="album-card-actions">
+                    @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
+                </div>
             </article>
         }
         </div>
@@ -77,6 +81,9 @@
                         <p class="album-price">@album.Genre?.Name</p>
                     </div>
                 </a>
+                <div class="album-card-actions">
+                    @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
+                </div>
             </article>
         }
         </div>
