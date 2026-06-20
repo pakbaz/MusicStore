@@ -1,0 +1,25 @@
+@model IReadOnlyList<MvcMusicStore.Models.Bundle>
+@{
+    ViewBag.Title = "Deals & Bundles";
+}
+
+<section class="content-section" aria-label="Album bundles">
+    <div class="section-heading">
+        <h1>Deals &amp; bundles</h1>
+        <p class="section-subtitle">Hand-picked album bundles at a discount. Buy more, save more.</p>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <p class="section-subtitle">No bundles are available right now. Check back soon!</p>
+    }
+    else
+    {
+        <div class="bundle-grid">
+            @foreach (var bundle in Model)
+            {
+                <partial name="_BundleCard" model="bundle" />
+            }
+        </div>
+    }
+</section>

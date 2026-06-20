@@ -38,6 +38,12 @@ namespace MvcMusicStore.Models
                 return cart!;
             }
 
+            if (cart.IsBundle)
+            {
+                // Bundle lines represent multiple albums; they render from bundle fields instead.
+                return cart;
+            }
+
             cart.Album ??= new Album
             {
                 AlbumId = cart.AlbumId,
