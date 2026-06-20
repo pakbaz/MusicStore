@@ -12,7 +12,7 @@
         @foreach (var album in Model.Albums!)
         {
             <article class="album-card">
-                <a class="album-card-link" href="@Url.Action("Details", new { id = album.AlbumId })">
+                <a class="album-card-link" href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                     <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                     <div class="album-card-body">
                         <h3 class="album-title">@album.Title</h3>

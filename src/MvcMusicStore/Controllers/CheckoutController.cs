@@ -15,19 +15,23 @@ namespace MvcMusicStore.Controllers
         private readonly MusicStoreEntities storeDB;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILoyaltyService _loyalty;
+        private readonly IGiftCardService giftCards;
         private readonly IOrderEmailSender emailSender;
         private readonly ILogger<CheckoutController> logger;
+        const string PromoCode = "FREE";
 
         public CheckoutController(
             MusicStoreEntities storeDb,
             UserManager<ApplicationUser> userManager,
             ILoyaltyService loyalty,
+            IGiftCardService giftCardService,
             IOrderEmailSender emailSender,
             ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             _userManager = userManager;
             _loyalty = loyalty;
+            giftCards = giftCardService;
             this.emailSender = emailSender;
             this.logger = logger;
         }
@@ -56,13 +60,14 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         public async Task<IActionResult> AddressAndPayment(Order order)
         {
+            var promoCode = Request.Form["PromoCode"].ToString();
+            var giftCardCode = Request.Form["GiftCardCode"].ToString();
+            ViewBag.PromoCode = promoCode;
+            ViewBag.GiftCardCode = giftCardCode;
+
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
             var user = await _userManager.GetUserAsync(User);
             await PopulateLoyaltyViewBagAsync(user, await cart.GetTotalAsync());
-
-            // Promo codes are optional and informational only for now; preserve any entered
-            // value when redisplaying the form. Real validation/discounts are tracked separately.
-            ViewBag.PromoCode = Request.Form["PromoCode"].ToString();
 
             if (!ModelState.IsValid)
                 return View(order);
@@ -71,6 +76,35 @@ namespace MvcMusicStore.Controllers
             {
                 TempData["CartMessage"] = "Your cart is empty. Add music before checking out.";
                 return RedirectToAction("Index", "ShoppingCart");
+            }
+
+            var cartTotal = await cart.GetTotalAsync();
+
+            // Resolve an optional gift card. The gift card is a payment method that pays the order
+            // total down; the FREE promo is a discount that clears any remainder.
+            GiftCard? giftCard = null;
+            decimal giftApplied = 0m;
+            if (!string.IsNullOrWhiteSpace(giftCardCode))
+            {
+                giftCard = await giftCards.GetActiveByCodeAsync(giftCardCode);
+                if (giftCard == null || giftCard.Balance <= 0)
+                {
+                    ModelState.AddModelError("GiftCardCode", "That gift card code is not valid or has no remaining balance.");
+                    return View(order);
+                }
+
+                giftApplied = Math.Min(giftCard.Balance, cartTotal);
+            }
+
+            var remainingDue = cartTotal - giftApplied;
+            var promoValid = string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase);
+
+            // An order can be placed only when the remainder after the gift card is fully covered,
+            // either by the gift card itself or by the FREE promo discount.
+            if (remainingDue > 0 && !promoValid)
+            {
+                ModelState.AddModelError("PromoCode", "Enter promo code FREE or a gift card that covers your order total to place your order.");
+                return View(order);
             }
 
             order.OrderId = await storeDB.NextOrderIdAsync();
@@ -97,10 +131,23 @@ namespace MvcMusicStore.Controllers
                 order.LoyaltyPointsEarned = _loyalty.CalculateEarnedPoints(subtotal, _loyalty.GetTier(user.LifetimeSpend));
             }
 
+            // Apply the gift card against the post-loyalty order total, recording a redemption
+            // transaction on the tracked card.
+            if (giftCard != null && giftApplied > 0)
+            {
+                var applied = giftCards.Redeem(giftCard, order.Total, order.OrderId, order.Username);
+                order.GiftCardCode = giftCard.Code;
+                order.GiftCardAmountApplied = applied;
+            }
+
+            order.AmountDue = promoValid ? 0m : Math.Max(0m, order.Total - order.GiftCardAmountApplied);
+
             // Persist the order first. The loyalty balance lives in a separate Cosmos context with no
-            // shared transaction, so saving the order before charging points ensures a customer can
+            // shared transaction, so saving the order before crediting points ensures a customer can
             // never have points deducted without a recorded order.
             storeDB.Orders.Add(order);
+
+            // Save all changes (new order + any gift-card balance update)
             await storeDB.SaveChangesAsync();
 
             // Accrue points / update tier / pay out any referral reward on first purchase.

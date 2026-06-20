@@ -1,0 +1,67 @@
+@model MvcMusicStore.ViewModels.SendGiftViewModel
+@{
+    ViewBag.Title = "Send as a Gift";
+}
+
+<h2>Send as a Gift</h2>
+<p class="section-subtitle">We'll email your recipient a link to redeem this album.</p>
+
+<div class="gift-album-summary">
+    <img class="gift-album-art"
+         alt="@Model.AlbumTitle"
+         src="@Url.Content(Model.AlbumArtUrl ?? MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)"
+         data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+    <div>
+        <h3>@Model.AlbumTitle</h3>
+        <p class="detail-artist">@Model.ArtistName</p>
+        <p class="detail-price">@Model.AlbumPrice.ToString("C")</p>
+    </div>
+</div>
+
+@using (Html.BeginForm("Send", "Gift", FormMethod.Post, new { @class = "form-horizontal", role = "form" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.AlbumId)
+    @Html.ValidationSummary(false, "", new { @class = "text-danger", role = "alert" })
+
+    <fieldset>
+        <legend>Recipient</legend>
+        <div class="form-group">
+            @Html.LabelFor(m => m.RecipientEmail, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.RecipientEmail, new { @class = "form-control", type = "email", autocomplete = "off", placeholder = "name@example.com" })
+                @Html.ValidationMessageFor(m => m.RecipientEmail, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.RecipientName, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.RecipientName, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.SenderName, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.SenderName, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.Message, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextAreaFor(m => m.Message, new { @class = "form-control", rows = "3", placeholder = "Add a personal note (optional)" })
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="form-group">
+        <div class="col-md-offset-2 col-md-10">
+            <input type="submit" class="btn btn-primary" value="Send gift" />
+            <a class="btn btn-default" href="@Url.Action("Details", "Store", new { id = Model.AlbumId })">Back to album</a>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}

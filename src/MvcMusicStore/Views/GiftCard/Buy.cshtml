@@ -1,0 +1,84 @@
+@model MvcMusicStore.ViewModels.BuyGiftCardViewModel
+@{
+    ViewBag.Title = "Buy a Gift Card";
+}
+
+<h2>Buy a Gift Card</h2>
+<p class="section-subtitle">Send a digital gift card by email. The recipient gets a code to spend on any music in the store.</p>
+
+@using (Html.BeginForm("Buy", "GiftCard", FormMethod.Post, new { @class = "form-horizontal", role = "form" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.ValidationSummary(false, "", new { @class = "text-danger", role = "alert" })
+
+    <fieldset>
+        <legend>Gift card amount</legend>
+        <div class="form-group">
+            <label class="col-md-2 control-label">Amount</label>
+            <div class="col-md-10">
+                <div class="gift-amount-options">
+                    @foreach (var preset in MvcMusicStore.ViewModels.BuyGiftCardViewModel.PresetAmounts)
+                    {
+                        <label class="gift-amount-option">
+                            @Html.RadioButtonFor(m => m.Amount, preset, new { @class = "gift-amount-radio" })
+                            <span>@preset.ToString("C0")</span>
+                        </label>
+                    }
+                </div>
+                <p class="help-block">Pick a preset above, or enter a custom amount below (it takes priority).</p>
+            </div>
+        </div>
+
+        <div class="form-group">
+            @Html.LabelFor(m => m.CustomAmount, new { @class = "col-md-2 control-label" })
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-addon">$</span>
+                    @Html.TextBoxFor(m => m.CustomAmount, new { @class = "form-control", type = "number", min = "5", max = "500", step = "1", placeholder = "Custom" })
+                </div>
+                @Html.ValidationMessageFor(m => m.CustomAmount, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Recipient</legend>
+        <div class="form-group">
+            @Html.LabelFor(m => m.RecipientEmail, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.RecipientEmail, new { @class = "form-control", type = "email", autocomplete = "off", placeholder = "name@example.com" })
+                @Html.ValidationMessageFor(m => m.RecipientEmail, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.RecipientName, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.RecipientName, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.SenderName, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextBoxFor(m => m.SenderName, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            @Html.LabelFor(m => m.Message, new { @class = "col-md-2 control-label" })
+            <div class="col-md-6">
+                @Html.TextAreaFor(m => m.Message, new { @class = "form-control", rows = "3", placeholder = "Add a personal note (optional)" })
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="form-group">
+        <div class="col-md-offset-2 col-md-10">
+            <input type="submit" class="btn btn-primary" value="Send gift card" />
+            <a class="btn btn-default" href="@Url.Action("Index", "GiftCard")">My gift cards</a>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}

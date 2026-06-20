@@ -132,6 +132,10 @@ builder.Services.AddScoped<IOrderEmailSender, LoggingOrderEmailSender>();
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 
+// Gift cards and gifting: simulated email delivery + gift-card issuance/redemption.
+builder.Services.AddSingleton<IEmailSender, LoggingEmailSender>();
+builder.Services.AddScoped<IGiftCardService, GiftCardService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -150,6 +154,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseSession();
+
+// Clean, human-readable URLs for albums and artists. These are additive named routes; the
+// legacy {controller}/{action}/{id} URLs keep working. Slug links are generated via the route
+// names so generation is deterministic regardless of the catch-all default route below.
+app.MapControllerRoute(
+    name: "album",
+    pattern: "album/{id:int}/{slug?}",
+    defaults: new { controller = "Store", action = "Details" });
+
+app.MapControllerRoute(
+    name: "artist",
+    pattern: "artist/{id:int}/{slug?}",
+    defaults: new { controller = "Store", action = "Artist" });
 
 app.MapControllerRoute(
     name: "default",

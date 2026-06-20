@@ -1,6 +1,13 @@
 ﻿@model MvcMusicStore.ViewModels.CatalogIndexViewModel
 @{
-    ViewBag.Title = "Store Catalog";
+    ViewBag.Title = "Catalog";
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = "Browse the music catalog",
+        Description = "Browse and buy albums across genres on MVC Music Store. " +
+            "Filter by genre, price, and availability, preview tracks, and add favorites to your cart.",
+        OgType = "website"
+    };
 }
 
 <section class="content-section" aria-label="Store catalog filters">
@@ -69,7 +76,7 @@
             @foreach (var album in Model.Albums)
             {
                 <li>
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                         <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h2 class="h5">@album.Title</h2>
                     </a>
@@ -83,6 +90,16 @@
                     else
                     {
                         <span class="label label-default">Out of stock</span>
+                    }
+                    @if (album.HasPreview)
+                    {
+                        @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                        {
+                            PreviewUrl = album.PreviewUrl!,
+                            DurationSeconds = album.PreviewDurationSeconds,
+                            Title = album.Title,
+                            Variant = "card"
+                        })
                     }
                 </li>
             }
