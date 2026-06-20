@@ -13,12 +13,20 @@ namespace MvcMusicStore.Controllers
     {
         private readonly MusicStoreEntities storeDB;
         private readonly IGiftCardService giftCards;
+        private readonly IOrderEmailSender emailSender;
+        private readonly ILogger<CheckoutController> logger;
         const string PromoCode = "FREE";
 
-        public CheckoutController(MusicStoreEntities storeDb, IGiftCardService giftCardService)
+        public CheckoutController(
+            MusicStoreEntities storeDb,
+            IGiftCardService giftCardService,
+            IOrderEmailSender emailSender,
+            ILogger<CheckoutController> logger)
         {
             storeDB = storeDb;
             giftCards = giftCardService;
+            this.emailSender = emailSender;
+            this.logger = logger;
         }
 
         //
@@ -89,6 +97,7 @@ namespace MvcMusicStore.Controllers
             order.OrderId = await storeDB.NextOrderIdAsync();
             order.Username = User.Identity!.Name!;
             order.OrderDate = DateTime.Now;
+            order.Status = "Paid";
 
             // Process the order (builds embedded order details, sets Total, and empties the cart)
             await cart.CreateOrderAsync(order);
@@ -109,6 +118,16 @@ namespace MvcMusicStore.Controllers
             // Save all changes (new order + any gift-card balance update)
             await storeDB.SaveChangesAsync();
 
+            // Send the confirmation receipt. A delivery failure must never fail a placed order.
+            try
+            {
+                await emailSender.SendOrderConfirmationAsync(order);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to send confirmation email for order {OrderId}.", order.OrderId);
+            }
+
             return RedirectToAction("Complete", new { id = order.OrderId });
         }
 
@@ -118,13 +137,14 @@ namespace MvcMusicStore.Controllers
         public async Task<IActionResult> Complete(int id)
         {
             // Validate customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS subquery),
-            // so materialize the matching order with Take(1) instead.
-            var orders = await storeDB.Orders
+            // so materialize a single matching order with Take(1) instead. Owned OrderDetails are
+            // part of the same document, so they load with the order for the confirmation summary.
+            var matchingOrders = await storeDB.Orders
                 .Where(o => o.OrderId == id && o.Username == User.Identity!.Name)
                 .Take(1)
                 .ToListAsync();
+            var order = matchingOrders.FirstOrDefault();
 
-            var order = orders.FirstOrDefault();
             if (order != null)
             {
                 return View(order);

@@ -114,6 +114,12 @@ builder.Services.AddHttpClient<IAiMusicCreationService, AceStepMusicCreationServ
     client.Timeout = TimeSpan.FromSeconds(timeoutSeconds <= 0 ? 600 : timeoutSeconds);
 });
 
+// Order confirmation email. The default sender logs the rendered receipt; swap this
+// registration for an SMTP-backed IOrderEmailSender to deliver real mail.
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddScoped<IOrderEmailSender, LoggingOrderEmailSender>();
+
 // Add IHttpContextAccessor (used by ShoppingCart)
 builder.Services.AddHttpContextAccessor();
 

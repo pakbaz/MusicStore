@@ -106,7 +106,7 @@
         <div class="form-group">
             @Html.Label("PromoCode", "Promo Code", new { @class = "control-label col-md-2" })
             <div class="col-md-6">
-                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code", autocomplete = "off" })
+                @Html.TextBox("PromoCode", ViewBag.PromoCode as string, new { @class = "form-control", placeholder = "Enter promo code (optional)", autocomplete = "off" })
                 @Html.ValidationMessage("PromoCode", string.Empty, new { @class = "text-danger" })
             </div>
         </div>
