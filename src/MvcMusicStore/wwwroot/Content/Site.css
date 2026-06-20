@@ -1359,6 +1359,226 @@ input[type="checkbox"].input-validation-error {
     color: var(--text-muted);
     font-size: 13px;
 }
+
+/* --------------------------------------------------------------------------
+   Ratings & reviews (social proof)
+   -------------------------------------------------------------------------- */
+.star-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    white-space: nowrap;
+}
+.star-rating-stars {
+    display: inline-flex;
+    gap: 2px;
+    color: var(--accent);
+}
+.star-rating-stars .glyphicon {
+    font-size: 13px;
+    top: 1px;
+}
+.star-rating-empty .star-rating-stars {
+    color: var(--text-faint);
+}
+.star-rating-value {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+}
+.star-rating-count,
+.star-rating-none {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.album-card-rating {
+    margin: 4px 0;
+}
+
+.detail-rating {
+    margin: 4px 0 12px;
+}
+.detail-rating-link {
+    text-decoration: none;
+    display: inline-flex;
+}
+.detail-rating-link:hover .star-rating-value {
+    color: var(--link-hover);
+}
+.detail-rating-link .star-rating-stars {
+    font-size: 16px;
+}
+.detail-rating-link .star-rating-stars .glyphicon {
+    font-size: 16px;
+}
+
+.reviews-section {
+    scroll-margin-top: 90px;
+}
+.reviews-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.reviews-summary .star-rating-stars {
+    font-size: 18px;
+}
+.reviews-summary .star-rating-stars .glyphicon {
+    font-size: 18px;
+}
+.reviews-summary-meta {
+    color: var(--text-muted);
+}
+
+.review-form-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-card);
+}
+.review-form-card h3 {
+    margin-top: 0;
+}
+.review-form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+/* Accessible pure-CSS star input: radios are rendered 5..1 and reversed so
+   hovering or selecting a star also fills every lower star. */
+.star-input {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    gap: 4px;
+}
+.star-input input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+.star-input label {
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 26px;
+    margin: 0;
+    transition: color 0.12s ease;
+}
+.star-input label .glyphicon {
+    top: 0;
+}
+.star-input label:hover,
+.star-input label:hover ~ label,
+.star-input input[type="radio"]:checked ~ label {
+    color: var(--accent);
+}
+.star-input input[type="radio"]:focus + label {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.review-gate {
+    margin-bottom: 24px;
+}
+
+.review-list {
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+}
+.review-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+}
+.review-card-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.review-author {
+    font-weight: 600;
+    color: var(--text);
+}
+.review-date,
+.review-edited {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.review-body {
+    margin: 0;
+    color: var(--text);
+    white-space: pre-wrap;
+}
+.review-report-form {
+    margin: 8px 0 0;
+}
+.review-report-btn {
+    padding: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.review-report-btn:hover:not([disabled]) {
+    color: var(--danger);
+}
+.review-report-btn[disabled] {
+    color: var(--text-faint);
+    cursor: default;
+    text-decoration: none;
+}
+
+.review-pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+}
+.review-pagination-status {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Admin moderation */
+.review-moderation-filters {
+    margin-bottom: 16px;
+}
+.review-moderation-table .review-moderation-body {
+    max-width: 360px;
+}
+.review-report-reason {
+    display: block;
+    font-size: 12px;
+    margin-top: 4px;
+}
+.review-row-reported > td {
+    background: var(--accent-soft);
+}
+.review-moderation-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.review-moderation-form {
+    margin: 0;
+}
 /* Social share buttons (album details) */
 .share-bar {
     display: flex;
