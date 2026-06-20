@@ -27,6 +27,12 @@
                 <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span>
                 Add to cart
             </a>
+            <a class="btn btn-default btn-lg"
+               href="@Url.Action("Send", "Gift", new { id = Model.Album.AlbumId })"
+               aria-label="Send @Model.Album.Title as a gift">
+                <span class="glyphicon glyphicon-gift" aria-hidden="true"></span>
+                Send as a gift
+            </a>
             <a class="btn btn-default btn-lg" href="@Url.Action("Browse", "Store", new { genre = Model.Album.Genre.Name })">
                 Back to @Model.Album.Genre.Name
             </a>

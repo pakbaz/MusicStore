@@ -28,6 +28,8 @@ namespace MvcMusicStore.Models
                 AddAlbumCatalogMetadata(albums);
                 context.Albums.AddRange(albums);
 
+                context.GiftCards.Add(BuildDemoGiftCard());
+
                 await context.SaveChangesAsync();
             }
 
@@ -113,6 +115,38 @@ namespace MvcMusicStore.Models
                 context.Reviews.AddRange(reviews);
                 await context.SaveChangesAsync();
             }
+        }
+
+        private static GiftCard BuildDemoGiftCard()
+        {
+            var now = DateTime.Now;
+            var card = new GiftCard
+            {
+                GiftCardId = 1,
+                Code = "GIFT-DEMO-0001",
+                InitialAmount = 50m,
+                Balance = 50m,
+                PurchaserUsername = "Administrator",
+                RecipientEmail = "friend@example.com",
+                RecipientName = "A Friend",
+                SenderName = "The Music Store",
+                Message = "Enjoy some music on us!",
+                CreatedDate = now,
+                IsActive = true
+            };
+
+            card.Transactions.Add(new GiftCardTransaction
+            {
+                TransactionId = 1,
+                Date = now,
+                Type = GiftCardTransactionTypes.Issued,
+                Amount = 50m,
+                BalanceAfter = 50m,
+                Username = "Administrator",
+                Note = "Demo gift card"
+            });
+
+            return card;
         }
 
         private static void AssignAlbumKeys(List<Album> albums)
