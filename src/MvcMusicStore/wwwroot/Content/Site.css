@@ -1444,3 +1444,184 @@ input[type="checkbox"].input-validation-error {
 }
 
 .admin-heading p { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Social share buttons (album details) */
+.share-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+}
+.share-label {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+.share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.share-btn:hover,
+.share-btn:focus {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    text-decoration: none;
+}
+.share-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+.share-copy {
+    font-family: inherit;
+}
+
+/* Audio preview player (issue #29) */
+.audio-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-card);
+}
+.audio-preview audio { display: none; }
+
+.audio-preview-toggle {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+.audio-preview-toggle:hover { background: var(--accent-press); }
+.audio-preview-toggle:active { transform: scale(0.95); }
+.audio-preview-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.audio-preview-toggle .glyphicon { font-size: 16px; line-height: 1; }
+.audio-preview.is-playing .audio-preview-toggle { box-shadow: 0 0 0 4px var(--accent-soft); }
+
+.audio-preview-scrubber {
+    flex: 1 1 auto;
+    min-width: 80px;
+    height: 6px;
+    margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+.audio-preview-scrubber::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+}
+.audio-preview-scrubber::-moz-range-track {
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+}
+.audio-preview-scrubber::-moz-range-progress {
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+}
+.audio-preview-scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -4px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--bg-2);
+}
+.audio-preview-scrubber::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--bg-2);
+}
+.audio-preview-scrubber:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.audio-preview-time {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.audio-preview-badge {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-radius: var(--radius-pill);
+    padding: 3px 9px;
+}
+.audio-preview.is-unavailable { opacity: 0.6; }
+
+/* Compact variant for catalog cards */
+.audio-preview--card {
+    gap: 8px;
+    padding: 6px 8px;
+}
+.audio-preview--card .audio-preview-toggle { width: 34px; height: 34px; }
+.audio-preview--card .audio-preview-toggle .glyphicon { font-size: 13px; }
+.audio-preview--card .audio-preview-time,
+.audio-preview--card .audio-preview-badge { display: none; }
+
+/* Gift cards and gifting */
+.gift-amount-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.gift-amount-option {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 10px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+    background: var(--panel); color: var(--text); font-weight: 600; margin: 0;
+}
+.gift-amount-option:hover { border-color: var(--accent); }
+.gift-amount-radio { margin: 0; accent-color: var(--accent); }
+
+.gift-card-receipt { border-color: var(--border-strong); }
+.gift-card-code-label { margin: 0 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
+.gift-card-code {
+    font-family: var(--font-display); font-size: 1.6rem; font-weight: 800;
+    letter-spacing: 3px; color: var(--accent-text); margin: 0 0 8px; word-break: break-all;
+}
+
+.gift-album-summary { display: flex; gap: 18px; align-items: center; margin: 0 0 24px; flex-wrap: wrap; }
+.gift-album-art {
+    width: 120px; height: 120px; object-fit: cover; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); box-shadow: var(--shadow-card);
+}
+.gift-message {
+    border-left: 3px solid var(--accent); padding: 6px 14px; margin: 10px 0 0;
+    color: var(--text); font-style: italic;
+}
+.gift-balance-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }

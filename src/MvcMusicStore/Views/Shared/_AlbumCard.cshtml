@@ -1,7 +1,7 @@
 ﻿@model MvcMusicStore.ViewModels.AlbumCardViewModel
 
 <article class="album-card">
-    <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = Model.AlbumId })">
+    <a class="album-card-link" href="@Url.AlbumUrl(Model.AlbumId, Model.Title)">
         <div class="album-card-media">
             <img alt="@Model.Title" src="@Url.Content(Model.ThumbnailUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
             @if (Model.IsOnSale)

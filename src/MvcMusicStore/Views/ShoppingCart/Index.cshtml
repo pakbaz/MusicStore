@@ -146,7 +146,7 @@
             {
                 <tr id="row-@line.RecordId" class="cart-row">
                     <td>
-                        @Html.ActionLink(line.Title, "Details", "Store", new { id = line.AlbumId }, null)
+                        <a href="@Url.AlbumUrl(line.AlbumId, line.Title)">@line.Title</a>
                         @if (line.IsOnSale)
                         {
                             <span class="sale-badge" title="@line.SaleName">Sale</span>

@@ -10,6 +10,8 @@ namespace MvcMusicStore.Controllers
 {
     public class HomeController : Controller
     {
+        private const int SectionSize = 6;
+
         private readonly MusicStoreEntities storeDB;
         private readonly IPromotionService promotions;
 
@@ -24,16 +26,39 @@ namespace MvcMusicStore.Controllers
 
         public async Task<IActionResult> Index()
         {
-            const int sectionSize = 6;
+            // Each homepage section is a small, bounded query so the page never materializes the
+            // whole Albums container or scans every Order to rank popularity.
+            var featuredAlbums = await storeDB.Albums
+                .Where(a => a.IsFeatured)
+                .OrderBy(a => a.Title)
+                .Take(SectionSize)
+                .ToListAsync();
 
-            var albums = await storeDB.Albums.ToListAsync();
-            albums.PopulateNavigation();
-            var salesByAlbum = await GetSalesByAlbumAsync();
+            if (featuredAlbums.Count < SectionSize)
+            {
+                var fillCount = SectionSize - featuredAlbums.Count;
+                var fillAlbums = await storeDB.Albums
+                    .Where(a => !a.IsFeatured)
+                    .OrderByDescending(a => a.AlbumId)
+                    .Take(fillCount)
+                    .ToListAsync();
+                featuredAlbums.AddRange(fillAlbums);
+            }
+            featuredAlbums.PopulateNavigation();
 
-            var featuredAlbums = GetFeaturedAlbums(albums, sectionSize);
-            var trendingAlbums = GetTopSellingAlbums(albums, salesByAlbum, sectionSize);
-            var featuredIds = featuredAlbums.Select(a => a.AlbumId).ToHashSet();
-            var curatedAlbums = GetNewReleases(albums, sectionSize, featuredIds);
+            var trendingAlbums = await storeDB.Albums
+                .OrderByDescending(a => a.Popularity)
+                .Take(SectionSize)
+                .ToListAsync();
+            trendingAlbums.PopulateNavigation();
+
+            var featuredIds = featuredAlbums.Select(a => a.AlbumId).ToList();
+            var curatedAlbums = await storeDB.Albums
+                .Where(a => !featuredIds.Contains(a.AlbumId))
+                .OrderByDescending(a => a.AlbumId)
+                .Take(SectionSize)
+                .ToListAsync();
+            curatedAlbums.PopulateNavigation();
 
             var shownAlbums = featuredAlbums
                 .Concat(trendingAlbums)
@@ -53,55 +78,6 @@ namespace MvcMusicStore.Controllers
             };
 
             return View(viewModel);
-        }
-
-        private static List<Album> GetFeaturedAlbums(List<Album> albums, int count)
-        {
-            var featuredAlbums = albums
-                .Where(a => a.IsFeatured)
-                .OrderBy(a => a.Title)
-                .Take(count)
-                .ToList();
-
-            if (featuredAlbums.Count >= count)
-            {
-                return featuredAlbums;
-            }
-
-            var featuredIds = featuredAlbums.Select(a => a.AlbumId).ToHashSet();
-            featuredAlbums.AddRange(albums
-                .Where(a => !featuredIds.Contains(a.AlbumId))
-                .OrderByDescending(a => a.AlbumId)
-                .Take(count - featuredAlbums.Count));
-
-            return featuredAlbums;
-        }
-
-        private static List<Album> GetTopSellingAlbums(List<Album> albums, IReadOnlyDictionary<int, int> salesByAlbum, int count)
-        {
-            return albums
-                .OrderByDescending(a => salesByAlbum.TryGetValue(a.AlbumId, out var sold) ? sold : 0)
-                .ThenByDescending(a => a.AlbumId)
-                .Take(count)
-                .ToList();
-        }
-
-        private static List<Album> GetNewReleases(List<Album> albums, int count, HashSet<int> excludeAlbumIds)
-        {
-            return albums
-                .Where(a => !excludeAlbumIds.Contains(a.AlbumId))
-                .OrderByDescending(a => a.AlbumId)
-                .Take(count)
-                .ToList();
-        }
-
-        private async Task<Dictionary<int, int>> GetSalesByAlbumAsync()
-        {
-            var orders = await storeDB.Orders.ToListAsync();
-            return orders
-                .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
-                .GroupBy(detail => detail.AlbumId)
-                .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
         }
     }
 }

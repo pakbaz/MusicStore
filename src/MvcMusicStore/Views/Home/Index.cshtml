@@ -1,7 +1,19 @@
 ﻿@model MvcMusicStore.ViewModels.HomeIndexViewModel
 
 @{
-    ViewBag.Title = "Home Page";
+    ViewBag.Title = "Home";
+
+    var siteUrl = Url.AbsoluteContent("~/");
+    var storeUrl = Url.Action("Index", "Store", null, Context.Request.Scheme) ?? siteUrl;
+    var searchTemplate = $"{storeUrl}?search={{search_term_string}}";
+    var logoUrl = Url.AbsoluteContent(Seo.LogoPath);
+
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = "Buy albums, preview tracks, and create AI music",
+        Description = Seo.DefaultDescription,
+        OgType = "website"
+    };
 }
 
 <section class="hero-panel" aria-label="Featured music">
@@ -20,8 +32,9 @@
     </div>
 </section>
 
-@if (Model.DealOfTheDay is MvcMusicStore.Services.DealOfTheDay deal)
+@if (Model.DealOfTheDay != null)
 {
+    var deal = Model.DealOfTheDay;
     <section class="deal-panel" aria-label="Deal of the Day">
         <div class="deal-copy">
             <p class="deal-kicker">Deal of the Day</p>
@@ -30,18 +43,18 @@
             <p class="deal-pricing">
                 <span class="price-was">@deal.Pricing.OriginalPrice.ToString("C")</span>
                 <span class="price-now">@deal.Pricing.EffectivePrice.ToString("C")</span>
-                @if (deal.Pricing.PercentOff is int percentOff)
+                @if (deal.Pricing.PercentOff.HasValue)
                 {
-                    <span class="deal-percent">@percentOff% off</span>
+                    <span class="deal-percent">@deal.Pricing.PercentOff.Value% off</span>
                 }
             </p>
             <div class="deal-countdown" data-deal-ends-utc="@deal.EndsUtc.ToString("o")" role="timer" aria-live="polite">
-                <span class="deal-countdown-label">Hurry — ends in</span>
+                <span class="deal-countdown-label">Hurry &mdash; ends in</span>
                 <span class="deal-countdown-clock" data-deal-countdown>--:--:--</span>
             </div>
             <div class="deal-actions">
                 <a class="btn btn-primary btn-lg" href="@Url.Action("AddToCart", "ShoppingCart", new { id = deal.Album.AlbumId })">Add to cart</a>
-                <a class="btn btn-default btn-lg" href="@Url.Action("Details", "Store", new { id = deal.Album.AlbumId })">View album</a>
+                <a class="btn btn-default btn-lg" href="@Url.AlbumUrl(deal.Album.AlbumId, deal.Album.Title)">View album</a>
             </div>
         </div>
         <div class="deal-media">
@@ -89,6 +102,8 @@
     }
     </div>
 </section>
+
+@Html.Raw(StructuredData.HomeGraph(siteUrl, searchTemplate, logoUrl))
 
 @section scripts {
     <script src="~/Scripts/deal-countdown.js"></script>

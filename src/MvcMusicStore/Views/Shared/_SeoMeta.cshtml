@@ -1,0 +1,58 @@
+@using System.Globalization
+@using MvcMusicStore.Infrastructure
+@using MvcMusicStore.ViewModels
+@{
+    var seo = ViewData["Seo"] as SeoMetadata ?? new SeoMetadata();
+
+    var rawTitle = seo.Title ?? ViewData["Title"] as string;
+    var pageTitle = string.IsNullOrWhiteSpace(rawTitle)
+        ? Seo.SiteName
+        : $"{rawTitle} · {Seo.SiteName}";
+    var socialTitle = string.IsNullOrWhiteSpace(rawTitle) ? Seo.SiteName : rawTitle;
+
+    var description = Seo.Truncate(
+        string.IsNullOrWhiteSpace(seo.Description) ? Seo.DefaultDescription : seo.Description, 300);
+
+    var canonical = string.IsNullOrWhiteSpace(seo.CanonicalUrl) ? Url.CanonicalUrl() : seo.CanonicalUrl;
+    var image = string.IsNullOrWhiteSpace(seo.ImageUrl)
+        ? Url.AbsoluteContent(Seo.DefaultSocialImagePath)
+        : seo.ImageUrl;
+    var imageAlt = string.IsNullOrWhiteSpace(seo.ImageAlt) ? socialTitle : seo.ImageAlt;
+    var ogType = string.IsNullOrWhiteSpace(seo.OgType) ? "website" : seo.OgType;
+}
+<title>@pageTitle</title>
+<meta name="description" content="@description" />
+@if (!string.IsNullOrWhiteSpace(canonical))
+{
+    <link rel="canonical" href="@canonical" />
+}
+<meta property="og:site_name" content="@Seo.SiteName" />
+<meta property="og:type" content="@ogType" />
+<meta property="og:title" content="@socialTitle" />
+<meta property="og:description" content="@description" />
+@if (!string.IsNullOrWhiteSpace(canonical))
+{
+    <meta property="og:url" content="@canonical" />
+}
+@if (!string.IsNullOrWhiteSpace(image))
+{
+    <meta property="og:image" content="@image" />
+    <meta property="og:image:alt" content="@imageAlt" />
+}
+@if (string.Equals(ogType, "product", StringComparison.OrdinalIgnoreCase) && seo.Price.HasValue)
+{
+    <meta property="product:price:amount" content="@seo.Price.Value.ToString("0.00", CultureInfo.InvariantCulture)" />
+    <meta property="product:price:currency" content="@(string.IsNullOrWhiteSpace(seo.Currency) ? "USD" : seo.Currency)" />
+    @if (!string.IsNullOrWhiteSpace(seo.Availability))
+    {
+        <meta property="product:availability" content="@seo.Availability" />
+    }
+}
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="@socialTitle" />
+<meta name="twitter:description" content="@description" />
+@if (!string.IsNullOrWhiteSpace(image))
+{
+    <meta name="twitter:image" content="@image" />
+    <meta name="twitter:image:alt" content="@imageAlt" />
+}
