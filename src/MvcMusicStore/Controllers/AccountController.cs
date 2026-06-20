@@ -33,10 +33,18 @@ namespace MvcMusicStore.Controllers
         private async Task MigrateShoppingCartAsync(string userName)
         {
             var storeDb = HttpContext.RequestServices.GetRequiredService<MusicStoreEntities>();
+
             var cart = ShoppingCart.GetCart(storeDb, HttpContext);
             await cart.MigrateCartAsync(userName);
+
+            // Merge any session wishlist into the signed-in account, mirroring the cart.
+            var wishlist = Wishlist.GetWishlist(storeDb, HttpContext);
+            await wishlist.MigrateWishlistAsync(userName);
+
             await storeDb.SaveChangesAsync();
+
             HttpContext.Session.SetString(ShoppingCart.CartSessionKey, userName);
+            HttpContext.Session.SetString(Wishlist.WishlistSessionKey, userName);
         }
 
         //

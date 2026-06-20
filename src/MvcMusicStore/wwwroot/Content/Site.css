@@ -1164,6 +1164,116 @@ input[type="checkbox"].input-validation-error {
 .ai-error-actions { margin-top: 10px; }
 
 /* --------------------------------------------------------------------------
+   Wishlist / Save for later
+   -------------------------------------------------------------------------- */
+
+.wishlist-save-form {
+    margin: 0;
+    display: inline-flex;
+}
+
+.btn-wishlist {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.btn-wishlist .glyphicon {
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: color 0.18s ease;
+}
+
+.btn-wishlist:hover,
+.btn-wishlist:focus {
+    background: var(--nav-hover-bg);
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+.btn-wishlist:hover .glyphicon,
+.btn-wishlist:focus .glyphicon {
+    color: var(--danger);
+}
+
+.btn-wishlist.is-saved {
+    background: rgba(255, 107, 107, 0.12);
+    border-color: rgba(255, 107, 107, 0.4);
+    color: #ffb3b3;
+}
+
+.btn-wishlist.is-saved .glyphicon {
+    color: var(--danger);
+}
+
+/* Save button anchored under each album card / catalog list item */
+.album-card-actions {
+    padding: 0 15px 15px;
+}
+
+.catalog-item-actions {
+    padding: 12px 15px 0;
+}
+
+.album-card-actions .wishlist-save-form,
+.album-card-actions .btn-wishlist,
+.catalog-item-actions .wishlist-save-form,
+.catalog-item-actions .btn-wishlist {
+    width: 100%;
+}
+
+.album-card-actions .btn-wishlist,
+.catalog-item-actions .btn-wishlist {
+    justify-content: center;
+}
+
+/* Wishlist nav badge heart */
+.wishlist-nav-item .glyphicon-heart {
+    color: var(--danger);
+}
+
+/* Wishlist page */
+.wishlist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+}
+
+.wishlist-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.wishlist-row:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+.wishlist-row-art {
+    flex: 0 0 auto;
+    display: block;
+}
+
+.wishlist-row-art img {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+    display: block;
+}
+
+/* --------------------------------------------------------------------------
    Bundles & cross-sell (issue #30)
    -------------------------------------------------------------------------- */
 
@@ -1211,6 +1321,45 @@ input[type="checkbox"].input-validation-error {
     object-fit: cover;
     background: var(--bg-2);
     display: block;
+}
+
+.wishlist-row-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.wishlist-row-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.wishlist-row-title a {
+    color: var(--text);
+}
+
+.wishlist-row-price {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.wishlist-row-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (max-width: 560px) {
+    .wishlist-row {
+        flex-wrap: wrap;
+    }
+
+    .wishlist-row-actions {
+        width: 100%;
+    }
 }
 
 .bundle-badge {

@@ -3,6 +3,7 @@ using Azure.Identity;
 using Azure.Communication.Email;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
@@ -231,6 +232,12 @@ static async Task SeedDatabaseAsync(WebApplication app)
         var musicStoreDb = services.GetRequiredService<MusicStoreEntities>();
         await musicStoreDb.Database.EnsureCreatedAsync();
 
+        // EnsureCreatedAsync only provisions containers when the Cosmos database is first
+        // created. When the database already exists, containers added to the model later
+        // (such as the wishlist) are not created, and queries against them fail at runtime
+        // with a 404 "Collection not found". Reconcile any missing containers explicitly.
+        await EnsureModelContainersAsync(musicStoreDb);
+
         // The atomic id-counter container is managed via the Cosmos SDK (not an EF entity), so create
         // it explicitly. Partition key "/id" gives each counter its own logical partition.
         var catalogOptions = services.GetRequiredService<CosmosCatalogOptions>();
@@ -281,6 +288,30 @@ static async Task SeedDatabaseAsync(WebApplication app)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
+static async Task EnsureModelContainersAsync(DbContext db)
+{
+    if (!db.Database.IsCosmos())
+    {
+        return;
+    }
+
+    var cosmosClient = db.Database.GetCosmosClient();
+    var database = cosmosClient.GetDatabase(db.Database.GetCosmosDatabaseId());
+
+    var containerNames = db.Model.GetEntityTypes()
+        .Select(entityType => entityType.GetContainer())
+        .Where(name => !string.IsNullOrEmpty(name))
+        .Distinct(StringComparer.Ordinal);
+
+    foreach (var containerName in containerNames)
+    {
+        // Keyless entities map to a container partitioned on "/__partitionKey", matching
+        // the convention EF Core uses when it provisions the containers itself.
+        var containerProperties = new ContainerProperties(containerName!, new List<string> { "/__partitionKey" });
+        await database.CreateContainerIfNotExistsAsync(containerProperties);
     }
 }
 

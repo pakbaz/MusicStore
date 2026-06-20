@@ -1,0 +1,10 @@
+@model MvcMusicStore.ViewModels.WishlistSummaryViewModel
+
+<li id="wishlist-summary-item" class="wishlist-nav-item @(Model.WishlistCount > 0 ? string.Empty : "hidden")">
+    <a id="wishlist-summary-link"
+       href="@Url.Action("Index", "Wishlist")"
+       aria-label="Wishlist with @Model.WishlistCount item(s)">
+        <span class="glyphicon glyphicon-heart" aria-hidden="true"></span>
+        Wishlist (<span id="wishlist-summary-count">@Model.WishlistCount</span>)
+    </a>
+</li>

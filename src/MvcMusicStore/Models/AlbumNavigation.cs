@@ -63,5 +63,32 @@ namespace MvcMusicStore.Models
 
             return carts;
         }
+
+        public static WishlistItem PopulateAlbum(this WishlistItem item)
+        {
+            if (item is null)
+            {
+                return item!;
+            }
+
+            item.Album ??= new Album
+            {
+                AlbumId = item.AlbumId,
+                Title = item.AlbumTitle,
+                Price = item.AlbumPrice,
+                AlbumArtUrl = item.AlbumArtUrl
+            };
+            return item;
+        }
+
+        public static IEnumerable<WishlistItem> PopulateAlbum(this IEnumerable<WishlistItem> items)
+        {
+            foreach (var item in items)
+            {
+                item.PopulateAlbum();
+            }
+
+            return items;
+        }
     }
 }

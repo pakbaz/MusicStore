@@ -10,6 +10,7 @@ namespace MvcMusicStore.Models
         private const string ArtistCounter = "Artists";
         private const string OrderCounter = "Orders";
         private const string CartCounter = "Carts";
+        private const string WishlistCounter = "Wishlists";
         private const string BundleCounter = "Bundles";
 
         private readonly CosmosCatalogOptions _catalogOptions;
@@ -34,6 +35,7 @@ namespace MvcMusicStore.Models
         public DbSet<Genre>     Genres { get; set; }
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
+        public DbSet<WishlistItem> WishlistItems { get; set; }
         public DbSet<Order>     Orders { get; set; }
         public DbSet<Bundle>    Bundles { get; set; }
         public DbSet<Review>    Reviews { get; set; }
@@ -79,6 +81,13 @@ namespace MvcMusicStore.Models
                 b.ToContainer("Bundles");
                 b.HasKey(x => x.BundleId);
                 b.OwnsMany(x => x.Items);
+            });
+
+            modelBuilder.Entity<WishlistItem>(b =>
+            {
+                b.ToContainer("Wishlists");
+                b.HasKey(w => w.RecordId);
+                b.Ignore(w => w.Album);
             });
 
             modelBuilder.Entity<Order>(b =>
@@ -137,6 +146,9 @@ namespace MvcMusicStore.Models
         public Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
             => Sequences.NextAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
 
+        public Task<int> NextWishlistRecordIdAsync(CancellationToken cancellationToken = default)
+            => Sequences.NextAsync(WishlistCounter, MaxWishlistRecordIdAsync, cancellationToken);
+
         public Task<int> NextBundleIdAsync(CancellationToken cancellationToken = default)
             => Sequences.NextAsync(BundleCounter, MaxBundleIdAsync, cancellationToken);
 
@@ -150,6 +162,7 @@ namespace MvcMusicStore.Models
             await Sequences.EnsureInitializedAsync(ArtistCounter, MaxArtistIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(OrderCounter, MaxOrderIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
+            await Sequences.EnsureInitializedAsync(WishlistCounter, MaxWishlistRecordIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(BundleCounter, MaxBundleIdAsync, cancellationToken);
         }
 
@@ -180,6 +193,12 @@ namespace MvcMusicStore.Models
         private async Task<int> MaxCartRecordIdAsync(CancellationToken cancellationToken)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 0 : ids.Max();
+        }
+
+        private async Task<int> MaxWishlistRecordIdAsync(CancellationToken cancellationToken)
+        {
+            var ids = await WishlistItems.Select(w => w.RecordId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 0 : ids.Max();
         }
 

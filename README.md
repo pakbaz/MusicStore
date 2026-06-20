@@ -2,7 +2,7 @@
 
 An upgraded ASP.NET Core MVC version of the classic MVC Music Store sample, running on .NET 10 with Azure Cosmos DB, private Azure Blob Storage media, ASP.NET Core Identity, and an optional ACE-Step text-to-music generation service.
 
-The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, verified-purchaser ratings and reviews, administration, sign-in, shopping cart, checkout, a loyalty rewards and referral program, digital gift cards and album gifting, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
+The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, verified-purchaser ratings and reviews, administration, sign-in, shopping cart, wishlist (save for later), checkout, a loyalty rewards and referral program, digital gift cards and album gifting, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
 
 ## Screenshots
 
@@ -28,7 +28,7 @@ flowchart LR
 
     subgraph WebApp[MvcMusicStore]
         Controllers[Controllers and Razor views]
-        Components[ViewComponents: genre menu and cart summary]
+        Components[ViewComponents: genre menu, cart and wishlist summary]
         Identity[ASP.NET Core Identity]
         StoreDb[MusicStoreEntities EF Core context]
         IdentityDb[ApplicationDbContext EF Core context]

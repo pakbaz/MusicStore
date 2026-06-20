@@ -105,6 +105,9 @@
                             Variant = "card"
                         })
                     }
+                    <div class="catalog-item-actions">
+                        @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
+                    </div>
                 </li>
             }
         </ul>
