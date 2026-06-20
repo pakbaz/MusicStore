@@ -37,9 +37,12 @@ namespace MvcMusicStore.Controllers
 
         [HttpGet("music/{**blobName}")]
         public Task<IActionResult> Music(string blobName, CancellationToken cancellationToken)
-            => StreamBlobAsync(storageOptions.MusicContainer, blobName, "application/octet-stream", cancellationToken);
+            => StreamBlobAsync(storageOptions.MusicContainer, blobName, "application/octet-stream", enableRangeProcessing: true, cancellationToken);
 
         private async Task<IActionResult> StreamBlobAsync(string containerName, string blobName, string fallbackContentType, CancellationToken cancellationToken)
+            => await StreamBlobAsync(containerName, blobName, fallbackContentType, enableRangeProcessing: false, cancellationToken);
+
+        private async Task<IActionResult> StreamBlobAsync(string containerName, string blobName, string fallbackContentType, bool enableRangeProcessing, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(blobName))
             {
@@ -51,12 +54,28 @@ namespace MvcMusicStore.Controllers
 
             try
             {
+                Response.Headers.CacheControl = "public, max-age=86400";
+
+                // Range processing requires a seekable stream so the framework can serve byte ranges.
+                // This lets the preview player scrub, and is also required by Safari/iOS, which refuse
+                // to play <audio> without range support. OpenReadAsync returns a seekable stream that
+                // fetches ranges lazily, so we get this without buffering the whole blob in memory.
+                if (enableRangeProcessing)
+                {
+                    var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                    var rangeContentType = string.IsNullOrWhiteSpace(properties.Value.ContentType)
+                        ? fallbackContentType
+                        : properties.Value.ContentType;
+
+                    var seekableStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+                    return File(seekableStream, rangeContentType, enableRangeProcessing: true);
+                }
+
                 var download = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
                 var contentType = string.IsNullOrWhiteSpace(download.Value.Details.ContentType)
                     ? fallbackContentType
                     : download.Value.Details.ContentType;
 
-                Response.Headers.CacheControl = "public, max-age=86400";
                 return File(download.Value.Content, contentType);
             }
             catch (RequestFailedException ex) when (ex.Status == 404)

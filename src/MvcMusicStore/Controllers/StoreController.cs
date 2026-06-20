@@ -38,7 +38,9 @@ namespace MvcMusicStore.Controllers
                 IsAvailable = album.IsAvailable,
                 Popularity = salesByAlbum.TryGetValue(album.AlbumId, out var sold) ? sold : 0,
                 AverageRating = reviewStats.TryGetValue(album.AlbumId, out var stats) ? stats.AverageRating : 0d,
-                ReviewCount = reviewStats.TryGetValue(album.AlbumId, out var ratingStats) ? ratingStats.ReviewCount : 0
+                ReviewCount = reviewStats.TryGetValue(album.AlbumId, out var ratingStats) ? ratingStats.ReviewCount : 0,
+                PreviewUrl = album.PreviewUrl,
+                PreviewDurationSeconds = album.PreviewDurationSeconds
             });
 
             if (!string.IsNullOrWhiteSpace(search))

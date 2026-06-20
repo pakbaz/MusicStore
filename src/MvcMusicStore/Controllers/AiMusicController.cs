@@ -164,7 +164,11 @@ namespace MvcMusicStore.Controllers
                     ArtistName = artist.Name,
                     Price = result.SuggestedPrice,
                     AlbumArtUrl = result.AlbumArtUrl,
-                    AudioUrl = result.AudioUrl
+                    AudioUrl = result.AudioUrl,
+                    PreviewUrl = result.AudioUrl,
+                    PreviewDurationSeconds = result.DurationSeconds > 0
+                        ? Math.Clamp(result.DurationSeconds, 5, 60)
+                        : Album.DefaultPreviewDurationSeconds
                 };
 
                 db.Albums.Add(album);

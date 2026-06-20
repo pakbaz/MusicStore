@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
@@ -18,6 +21,8 @@ namespace MvcMusicStore.Controllers
         private readonly IAlbumArtworkService albumArtworkService;
         private readonly IThumbnailCacheService thumbnailCacheService;
         private readonly IWebHostEnvironment environment;
+        private readonly BlobServiceClient blobServiceClient;
+        private readonly StorageOptions storageOptions;
         private readonly ILogger<StoreManagerController> logger;
 
         private static readonly HashSet<string> AllowedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -29,17 +34,43 @@ namespace MvcMusicStore.Controllers
             ".webp"
         };
 
+        private static readonly HashSet<string> AllowedAudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp3",
+            ".m4a",
+            ".aac",
+            ".ogg",
+            ".oga",
+            ".wav"
+        };
+
+        private static readonly Dictionary<string, string> AudioContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".mp3"] = "audio/mpeg",
+            [".m4a"] = "audio/mp4",
+            [".aac"] = "audio/aac",
+            [".ogg"] = "audio/ogg",
+            [".oga"] = "audio/ogg",
+            [".wav"] = "audio/wav"
+        };
+
+        private const long MaxPreviewAudioBytes = 10 * 1024 * 1024;
+
         public StoreManagerController(
             MusicStoreEntities storeDb,
             IAlbumArtworkService albumArtworkService,
             IThumbnailCacheService thumbnailCacheService,
             IWebHostEnvironment environment,
+            BlobServiceClient blobServiceClient,
+            IOptions<StorageOptions> storageOptions,
             ILogger<StoreManagerController> logger)
         {
             db = storeDb;
             this.albumArtworkService = albumArtworkService;
             this.thumbnailCacheService = thumbnailCacheService;
             this.environment = environment;
+            this.blobServiceClient = blobServiceClient;
+            this.storageOptions = storageOptions.Value;
             this.logger = logger;
         }
 
@@ -80,9 +111,10 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Create
 
         [HttpPost]
-        public async Task<IActionResult> Create(Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
+        public async Task<IActionResult> Create(Album album, IFormFile? thumbnailFile, IFormFile? previewAudioFile, CancellationToken cancellationToken)
         {
             ValidateThumbnailFile(thumbnailFile);
+            ValidatePreviewAudioFile(previewAudioFile);
 
             if (ModelState.IsValid)
             {
@@ -94,6 +126,13 @@ namespace MvcMusicStore.Controllers
                 {
                     album.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(album.ArtistId, album.Title, cancellationToken);
                 }
+
+                if (previewAudioFile is { Length: > 0 })
+                {
+                    album.PreviewUrl = await SavePreviewAudioAsync(previewAudioFile, cancellationToken);
+                }
+
+                album.PreviewDurationSeconds = NormalizePreviewDuration(album.PreviewDurationSeconds);
 
                 album.AlbumId = await db.NextAlbumIdAsync(cancellationToken);
                 await ApplyDenormalizedNamesAsync(album, cancellationToken);
@@ -125,7 +164,7 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Edit/5
 
         [HttpPost]
-        public async Task<IActionResult> Edit(int id, Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
+        public async Task<IActionResult> Edit(int id, Album album, IFormFile? thumbnailFile, IFormFile? previewAudioFile, CancellationToken cancellationToken)
         {
             if (id != album.AlbumId)
             {
@@ -139,6 +178,7 @@ namespace MvcMusicStore.Controllers
             }
 
             ValidateThumbnailFile(thumbnailFile);
+            ValidatePreviewAudioFile(previewAudioFile);
 
             if (ModelState.IsValid)
             {
@@ -147,6 +187,7 @@ namespace MvcMusicStore.Controllers
                 existingAlbum.Title = album.Title;
                 existingAlbum.Price = album.Price;
                 existingAlbum.AlbumArtUrl = album.AlbumArtUrl;
+                existingAlbum.PreviewDurationSeconds = NormalizePreviewDuration(album.PreviewDurationSeconds);
 
                 if (thumbnailFile is { Length: > 0 })
                 {
@@ -157,6 +198,11 @@ namespace MvcMusicStore.Controllers
                          Album.IsPlaceholderThumbnailUrl(existingAlbum.AlbumArtUrl))
                 {
                     existingAlbum.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(existingAlbum.ArtistId, existingAlbum.Title, cancellationToken);
+                }
+
+                if (previewAudioFile is { Length: > 0 })
+                {
+                    existingAlbum.PreviewUrl = await SavePreviewAudioAsync(previewAudioFile, cancellationToken);
                 }
 
                 await ApplyDenormalizedNamesAsync(existingAlbum, cancellationToken);
@@ -366,6 +412,63 @@ namespace MvcMusicStore.Controllers
             await thumbnailFile.CopyToAsync(outputStream, cancellationToken);
 
             return $"~/Images/Uploads/{fileName}";
+        }
+
+        private static int NormalizePreviewDuration(int durationSeconds)
+        {
+            return durationSeconds <= 0
+                ? Album.DefaultPreviewDurationSeconds
+                : Math.Clamp(durationSeconds, 5, 60);
+        }
+
+        private static string ResolveAudioExtension(IFormFile audioFile)
+        {
+            var extension = Path.GetExtension(audioFile.FileName);
+            return string.IsNullOrWhiteSpace(extension) ? string.Empty : extension;
+        }
+
+        private void ValidatePreviewAudioFile(IFormFile? previewAudioFile)
+        {
+            if (previewAudioFile is null || previewAudioFile.Length == 0)
+            {
+                return;
+            }
+
+            if (previewAudioFile.Length > MaxPreviewAudioBytes)
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Preview audio must be 10 MB or smaller.");
+            }
+
+            var extension = ResolveAudioExtension(previewAudioFile);
+            if (!AllowedAudioExtensions.Contains(extension))
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Upload a valid audio file (.mp3, .m4a, .aac, .ogg, .wav).");
+            }
+
+            if (!previewAudioFile.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Upload a valid audio content type.");
+            }
+        }
+
+        private async Task<string> SavePreviewAudioAsync(IFormFile previewAudioFile, CancellationToken cancellationToken)
+        {
+            var extension = ResolveAudioExtension(previewAudioFile);
+            var contentType = AudioContentTypes.TryGetValue(extension, out var resolved) ? resolved : "audio/mpeg";
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(storageOptions.MusicContainer);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+
+            var blobName = $"{Guid.NewGuid():N}{extension}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            await using var stream = previewAudioFile.OpenReadStream();
+            await blobClient.UploadAsync(
+                stream,
+                new BlobUploadOptions { HttpHeaders = new BlobHttpHeaders { ContentType = contentType } },
+                cancellationToken);
+
+            return "/media/music/" + blobName;
         }
 
         private async Task<string?> TryFetchMetadataThumbnailAsync(int artistId, string? albumTitle, CancellationToken cancellationToken)

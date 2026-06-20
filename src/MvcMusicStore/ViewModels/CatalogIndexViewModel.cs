@@ -56,6 +56,9 @@ namespace MvcMusicStore.ViewModels
         public int Popularity { get; set; }
         public double AverageRating { get; set; }
         public int ReviewCount { get; set; }
+        public string? PreviewUrl { get; set; }
+        public int PreviewDurationSeconds { get; set; }
+        public bool HasPreview => !string.IsNullOrWhiteSpace(PreviewUrl);
     }
 
     public class CatalogIndexViewModel
