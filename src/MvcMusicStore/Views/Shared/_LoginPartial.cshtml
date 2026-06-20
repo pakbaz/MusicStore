@@ -6,10 +6,11 @@
             @Html.AntiForgeryToken()
         </form>
     </li>
-    <li>@Html.ActionLink("My Orders", "Index", "Order")</li>
     <li class="nav-greeting">
         @Html.ActionLink("Hi, " + User.Identity.Name, "Manage", "Account", routeValues: null, htmlAttributes: new { title = "Manage" })
     </li>
+    <li>@Html.ActionLink("My Orders", "Index", "Order")</li>
+    <li>@Html.ActionLink("My gift cards", "Index", "GiftCard")</li>
     <li>
         <button type="submit" form="logoutForm" class="btn btn-link navbar-btn nav-link-button">Log off</button>
     </li>

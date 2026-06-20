@@ -7,6 +7,11 @@ namespace MvcMusicStore.Controllers
 {
     public class StoreController : Controller
     {
+        private const int CatalogPageSize = 12;
+        private const int RelatedAlbumCount = 4;
+        private const int RelatedArtistCandidatePoolSize = 24;
+        private const int RelatedArtistAlbumCount = 6;
+
         private readonly MusicStoreEntities storeDB;
 
         public StoreController(MusicStoreEntities storeDb)
@@ -17,88 +22,139 @@ namespace MvcMusicStore.Controllers
         //
         // GET: /Store/
 
-        public async Task<IActionResult> Index(string? search, string? genre, decimal? minPrice, decimal? maxPrice, string? availability, string? sort)
+        public async Task<IActionResult> Index(string? search, string? genre, decimal? minPrice, decimal? maxPrice, string? availability, string? sort, int page = 1)
         {
             var normalizedSort = CatalogSortOptions.Normalize(sort);
             var normalizedAvailability = CatalogAvailabilityOptions.Normalize(availability);
 
-            var albums = await storeDB.Albums.ToListAsync();
-            var salesByAlbum = await GetSalesByAlbumAsync();
-
-            IEnumerable<CatalogAlbumItemViewModel> items = albums.Select(album => new CatalogAlbumItemViewModel
+            if (page < 1)
             {
-                AlbumId = album.AlbumId,
-                Title = album.Title ?? string.Empty,
-                ArtistName = album.ArtistName ?? string.Empty,
-                GenreName = album.GenreName ?? string.Empty,
-                Price = album.Price,
-                AlbumArtUrl = album.GetDisplayThumbnailUrl(),
-                ReleaseDate = album.ReleaseDate,
-                IsAvailable = album.IsAvailable,
-                Popularity = salesByAlbum.TryGetValue(album.AlbumId, out var sold) ? sold : 0
-            });
+                page = 1;
+            }
+
+            // Build the catalog query so Cosmos performs filtering, sorting, and paging server-side
+            // instead of materializing the whole Albums container on every request.
+            IQueryable<Album> filtered = storeDB.Albums;
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var term = search.Trim();
-                items = items.Where(album =>
-                    Contains(album.Title, term) ||
-                    Contains(album.ArtistName, term) ||
-                    Contains(album.GenreName, term));
+                var term = search.Trim().ToLower();
+                filtered = filtered.Where(album =>
+                    (album.Title != null && album.Title.ToLower().Contains(term)) ||
+                    (album.ArtistName != null && album.ArtistName.ToLower().Contains(term)) ||
+                    (album.GenreName != null && album.GenreName.ToLower().Contains(term)));
             }
 
             if (!string.IsNullOrWhiteSpace(genre))
             {
-                items = items.Where(album => string.Equals(album.GenreName, genre, StringComparison.OrdinalIgnoreCase));
+                filtered = filtered.Where(album => album.GenreName == genre);
             }
 
             if (minPrice.HasValue)
             {
-                items = items.Where(album => album.Price >= minPrice.Value);
+                filtered = filtered.Where(album => album.Price >= minPrice.Value);
             }
 
             if (maxPrice.HasValue)
             {
-                items = items.Where(album => album.Price <= maxPrice.Value);
+                filtered = filtered.Where(album => album.Price <= maxPrice.Value);
             }
 
             if (normalizedAvailability == CatalogAvailabilityOptions.Available)
             {
-                items = items.Where(album => album.IsAvailable);
+                filtered = filtered.Where(album => album.IsAvailable);
             }
             else if (normalizedAvailability == CatalogAvailabilityOptions.Unavailable)
             {
-                items = items.Where(album => !album.IsAvailable);
+                filtered = filtered.Where(album => !album.IsAvailable);
             }
 
-            items = normalizedSort switch
-            {
-                CatalogSortOptions.ReleaseDateDesc => items
-                    .OrderByDescending(album => album.ReleaseDate ?? DateTime.MinValue)
-                    .ThenBy(album => album.Title),
-                CatalogSortOptions.ReleaseDateAsc => items
-                    .OrderBy(album => album.ReleaseDate ?? DateTime.MaxValue)
-                    .ThenBy(album => album.Title),
-                CatalogSortOptions.PriceAsc => items
-                    .OrderBy(album => album.Price)
-                    .ThenBy(album => album.Title),
-                CatalogSortOptions.PriceDesc => items
-                    .OrderByDescending(album => album.Price)
-                    .ThenBy(album => album.Title),
-                _ => items
-                    .OrderByDescending(album => album.Popularity)
-                    .ThenBy(album => album.Title)
-            };
+            var totalResults = await filtered.CountAsync();
 
-            var albumList = items.ToList();
-            foreach (var album in albumList)
+            var totalPages = (int)Math.Ceiling(totalResults / (double)CatalogPageSize);
+            if (totalPages > 0 && page > totalPages)
             {
-                album.AlbumArtUrl = Album.NormalizeThumbnailUrl(album.AlbumArtUrl);
+                page = totalPages;
             }
 
-            var genreNames = albums
-                .Select(album => album.GenreName ?? string.Empty)
+            // Visible review aggregates are computed in memory because Cosmos cannot translate GROUP BY.
+            var reviewStats = await GetReviewStatsAsync();
+
+            List<CatalogAlbumItemViewModel> albumList;
+
+            if (normalizedSort == CatalogSortOptions.RatingDesc)
+            {
+                // Ratings live in a separate Cosmos container and cannot drive the Albums ORDER BY,
+                // so the "Top rated" sort materializes the filtered albums and orders them in memory.
+                albumList = (await filtered
+                        .Select(album => new CatalogRow
+                        {
+                            AlbumId = album.AlbumId,
+                            Title = album.Title,
+                            ArtistName = album.ArtistName,
+                            GenreName = album.GenreName,
+                            Price = album.Price,
+                            ReleaseDate = album.ReleaseDate,
+                            IsAvailable = album.IsAvailable,
+                            Popularity = album.Popularity,
+                            PreviewUrl = album.PreviewUrl,
+                            PreviewDurationSeconds = album.PreviewDurationSeconds,
+                            UploadedThumbnailUrl = album.UploadedThumbnailUrl,
+                            MetadataThumbnailUrl = album.MetadataThumbnailUrl,
+                            AlbumArtUrl = album.AlbumArtUrl
+                        })
+                        .ToListAsync())
+                    .Select(row => ToCatalogItem(row, reviewStats))
+                    .OrderByDescending(item => item.AverageRating)
+                    .ThenByDescending(item => item.ReviewCount)
+                    .ThenBy(item => item.Title)
+                    .Skip((page - 1) * CatalogPageSize)
+                    .Take(CatalogPageSize)
+                    .ToList();
+            }
+            else
+            {
+                // Cosmos default indexing can only serve single-property ORDER BY, so sort on one key.
+                IQueryable<Album> ordered = normalizedSort switch
+                {
+                    CatalogSortOptions.ReleaseDateDesc => filtered.OrderByDescending(album => album.ReleaseDate),
+                    CatalogSortOptions.ReleaseDateAsc => filtered.OrderBy(album => album.ReleaseDate),
+                    CatalogSortOptions.PriceAsc => filtered.OrderBy(album => album.Price),
+                    CatalogSortOptions.PriceDesc => filtered.OrderByDescending(album => album.Price),
+                    _ => filtered.OrderByDescending(album => album.Popularity)
+                };
+
+                albumList = (await ordered
+                        .Skip((page - 1) * CatalogPageSize)
+                        .Take(CatalogPageSize)
+                        .Select(album => new CatalogRow
+                        {
+                            AlbumId = album.AlbumId,
+                            Title = album.Title,
+                            ArtistName = album.ArtistName,
+                            GenreName = album.GenreName,
+                            Price = album.Price,
+                            ReleaseDate = album.ReleaseDate,
+                            IsAvailable = album.IsAvailable,
+                            Popularity = album.Popularity,
+                            PreviewUrl = album.PreviewUrl,
+                            PreviewDurationSeconds = album.PreviewDurationSeconds,
+                            UploadedThumbnailUrl = album.UploadedThumbnailUrl,
+                            MetadataThumbnailUrl = album.MetadataThumbnailUrl,
+                            AlbumArtUrl = album.AlbumArtUrl
+                        })
+                        .ToListAsync())
+                    .Select(row => ToCatalogItem(row, reviewStats))
+                    .ToList();
+            }
+
+            // Genre filter options come from the small Genres container rather than a distinct scan
+            // over the entire Albums container.
+            var genreNames = (await storeDB.Genres
+                    .Select(g => g.Name)
+                    .ToListAsync())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name!)
                 .Distinct()
                 .OrderBy(name => name)
                 .ToList();
@@ -113,7 +169,9 @@ namespace MvcMusicStore.Controllers
                 Sort = normalizedSort,
                 Genres = genreNames,
                 Albums = albumList,
-                TotalResults = albumList.Count
+                TotalResults = totalResults,
+                Page = page,
+                PageSize = CatalogPageSize
             };
 
             return View(catalogModel);
@@ -132,10 +190,9 @@ namespace MvcMusicStore.Controllers
             return RedirectToAction(nameof(Index), new { genre });
         }
 
-        public async Task<IActionResult> Details(int id)
+        public async Task<IActionResult> Details(int id, int reviewsPage = 1)
         {
-            var albums = await storeDB.Albums.ToListAsync();
-            var album = albums.FirstOrDefault(a => a.AlbumId == id);
+            var album = await storeDB.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
 
             if (album == null)
             {
@@ -144,25 +201,28 @@ namespace MvcMusicStore.Controllers
 
             album.PopulateNavigation();
 
-            var relatedByGenre = albums
+            var relatedByGenre = await storeDB.Albums
                 .Where(a => a.AlbumId != id && a.GenreId == album.GenreId)
                 .OrderBy(a => a.Title)
-                .Take(4)
-                .ToList();
+                .Take(RelatedAlbumCount)
+                .ToListAsync();
             relatedByGenre.PopulateNavigation();
 
-            var moreFromArtist = albums
+            var moreFromArtist = await storeDB.Albums
                 .Where(a => a.AlbumId != id && a.ArtistId == album.ArtistId)
                 .OrderBy(a => a.Title)
-                .Take(4)
-                .ToList();
+                .Take(RelatedAlbumCount)
+                .ToListAsync();
             moreFromArtist.PopulateNavigation();
+
+            var reviews = await BuildAlbumReviewsAsync(album, reviewsPage);
 
             var viewModel = new AlbumDetailsViewModel
             {
                 Album = album,
                 RelatedByGenre = relatedByGenre,
-                MoreFromArtist = moreFromArtist
+                MoreFromArtist = moreFromArtist,
+                Reviews = reviews
             };
 
             return View(viewModel);
@@ -177,24 +237,34 @@ namespace MvcMusicStore.Controllers
                 return NotFound();
             }
 
-            var albums = await storeDB.Albums.ToListAsync();
-
-            var artistAlbums = albums
+            var artistAlbums = await storeDB.Albums
                 .Where(a => a.ArtistId == id)
                 .OrderBy(a => a.Title)
-                .ToList();
+                .ToListAsync();
             artistAlbums.PopulateNavigation();
 
             var artistAlbumIds = artistAlbums.Select(a => a.AlbumId).ToHashSet();
-            var genreIds = artistAlbums.Select(a => a.GenreId).Distinct().ToHashSet();
+            var genreIds = artistAlbums.Select(a => a.GenreId).Distinct().ToList();
 
-            var relatedAlbums = albums
-                .Where(a => !artistAlbumIds.Contains(a.AlbumId) && genreIds.Contains(a.GenreId))
-                .OrderByDescending(a => a.IsFeatured)
-                .ThenBy(a => a.Title)
-                .Take(6)
-                .ToList();
-            relatedAlbums.PopulateNavigation();
+            var relatedAlbums = new List<Album>();
+            if (genreIds.Count > 0)
+            {
+                // Pull a bounded candidate pool ordered by a single key, then finish the
+                // featured-first / title ordering in memory to stay within Cosmos' single-key ORDER BY.
+                var candidates = await storeDB.Albums
+                    .Where(a => a.ArtistId != id && genreIds.Contains(a.GenreId))
+                    .OrderByDescending(a => a.IsFeatured)
+                    .Take(RelatedArtistCandidatePoolSize)
+                    .ToListAsync();
+
+                relatedAlbums = candidates
+                    .Where(a => !artistAlbumIds.Contains(a.AlbumId))
+                    .OrderByDescending(a => a.IsFeatured)
+                    .ThenBy(a => a.Title)
+                    .Take(RelatedArtistAlbumCount)
+                    .ToList();
+                relatedAlbums.PopulateNavigation();
+            }
 
             var viewModel = new ArtistDetailsViewModel
             {
@@ -206,18 +276,129 @@ namespace MvcMusicStore.Controllers
             return View(viewModel);
         }
 
-        private async Task<Dictionary<int, int>> GetSalesByAlbumAsync()
+        // Cosmos cannot translate GROUP BY aggregates, so visible reviews are materialized and
+        // averaged in memory (matching the popularity calculation above).
+        private async Task<Dictionary<int, ReviewStats>> GetReviewStatsAsync()
         {
-            var orders = await storeDB.Orders.ToListAsync();
-            return orders
-                .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
-                .GroupBy(detail => detail.AlbumId)
-                .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
+            var reviews = await storeDB.Reviews
+                .Where(review => !review.IsHidden)
+                .ToListAsync();
+
+            return reviews
+                .GroupBy(review => review.AlbumId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new ReviewStats(group.Average(review => review.Rating), group.Count()));
         }
 
-        private static bool Contains(string source, string term)
+        private static CatalogAlbumItemViewModel ToCatalogItem(CatalogRow row, IReadOnlyDictionary<int, ReviewStats> reviewStats)
         {
-            return source.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0;
+            var hasStats = reviewStats.TryGetValue(row.AlbumId, out var stats);
+            return new CatalogAlbumItemViewModel
+            {
+                AlbumId = row.AlbumId,
+                Title = row.Title ?? string.Empty,
+                ArtistName = row.ArtistName ?? string.Empty,
+                GenreName = row.GenreName ?? string.Empty,
+                Price = row.Price,
+                ReleaseDate = row.ReleaseDate,
+                IsAvailable = row.IsAvailable,
+                Popularity = row.Popularity,
+                AverageRating = hasStats ? stats.AverageRating : 0d,
+                ReviewCount = hasStats ? stats.ReviewCount : 0,
+                PreviewUrl = row.PreviewUrl,
+                PreviewDurationSeconds = row.PreviewDurationSeconds,
+                AlbumArtUrl = new Album
+                {
+                    UploadedThumbnailUrl = row.UploadedThumbnailUrl,
+                    MetadataThumbnailUrl = row.MetadataThumbnailUrl,
+                    AlbumArtUrl = row.AlbumArtUrl
+                }.GetDisplayThumbnailUrl()
+            };
         }
+
+        private sealed class CatalogRow
+        {
+            public int AlbumId { get; set; }
+            public string? Title { get; set; }
+            public string? ArtistName { get; set; }
+            public string? GenreName { get; set; }
+            public decimal Price { get; set; }
+            public DateTime? ReleaseDate { get; set; }
+            public bool IsAvailable { get; set; }
+            public int Popularity { get; set; }
+            public string? PreviewUrl { get; set; }
+            public int PreviewDurationSeconds { get; set; }
+            public string? UploadedThumbnailUrl { get; set; }
+            public string? MetadataThumbnailUrl { get; set; }
+            public string? AlbumArtUrl { get; set; }
+        }
+
+        private async Task<AlbumReviewsViewModel> BuildAlbumReviewsAsync(Album album, int reviewsPage)
+        {
+            const int pageSize = 5;
+
+            var albumReviews = await storeDB.Reviews
+                .Where(review => review.AlbumId == album.AlbumId && !review.IsHidden)
+                .ToListAsync();
+
+            var ordered = albumReviews
+                .OrderByDescending(review => review.UpdatedDate ?? review.CreatedDate)
+                .ToList();
+
+            var count = ordered.Count;
+            var average = count == 0 ? 0d : ordered.Average(review => review.Rating);
+            var totalPages = count == 0 ? 1 : (int)Math.Ceiling(count / (double)pageSize);
+            var page = Math.Clamp(reviewsPage, 1, totalPages);
+
+            var pageItems = ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(ToListItem)
+                .ToList();
+
+            var username = User.Identity?.Name;
+            var isAuthenticated = User.Identity?.IsAuthenticated == true;
+
+            var myReview = string.IsNullOrWhiteSpace(username)
+                ? null
+                : albumReviews.FirstOrDefault(review =>
+                    string.Equals(review.Username, username, StringComparison.OrdinalIgnoreCase));
+
+            var hasPurchased = isAuthenticated &&
+                await storeDB.HasPurchasedAlbumAsync(username, album.AlbumId);
+
+            return new AlbumReviewsViewModel
+            {
+                AlbumId = album.AlbumId,
+                AlbumTitle = album.Title ?? string.Empty,
+                Summary = new StarRatingViewModel { Average = average, Count = count },
+                Reviews = pageItems,
+                Page = page,
+                TotalPages = totalPages,
+                PageSize = pageSize,
+                IsAuthenticated = isAuthenticated,
+                HasPurchased = hasPurchased,
+                MyReview = myReview is null ? null : ToListItem(myReview),
+                Form = new CreateReviewViewModel
+                {
+                    AlbumId = album.AlbumId,
+                    Rating = myReview?.Rating ?? 0,
+                    Body = myReview?.Body
+                }
+            };
+        }
+
+        private static ReviewListItemViewModel ToListItem(Review review) => new()
+        {
+            ReviewId = review.ReviewId,
+            AlbumId = review.AlbumId,
+            Author = string.IsNullOrWhiteSpace(review.Username) ? "Anonymous" : review.Username!,
+            Rating = review.Rating,
+            Body = review.Body,
+            CreatedDate = review.CreatedDate,
+            WasEdited = review.UpdatedDate.HasValue,
+            IsReported = review.IsReported
+        };
     }
 }

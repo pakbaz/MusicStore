@@ -1,0 +1,29 @@
+@model MvcMusicStore.ViewModels.StarRatingViewModel
+@{
+    var hasRatings = Model.Count > 0;
+    var averageText = Model.Average.ToString("0.0");
+    var reviewWord = Model.Count == 1 ? "review" : "reviews";
+    var ariaLabel = hasRatings
+        ? $"Rated {averageText} out of 5 from {Model.Count} {reviewWord}"
+        : "No ratings yet";
+}
+<span class="star-rating@(hasRatings ? string.Empty : " star-rating-empty")" role="img" aria-label="@ariaLabel">
+    <span class="star-rating-stars" aria-hidden="true">
+        @for (var i = 1; i <= 5; i++)
+        {
+            <span class="glyphicon @(i <= Model.FilledStars ? "glyphicon-star" : "glyphicon-star-empty")"></span>
+        }
+    </span>
+    @if (hasRatings)
+    {
+        <span class="star-rating-value">@averageText</span>
+        @if (Model.ShowCount)
+        {
+            <span class="star-rating-count">(@Model.Count)</span>
+        }
+    }
+    else if (Model.ShowCount)
+    {
+        <span class="star-rating-none">No ratings yet</span>
+    }
+</span>

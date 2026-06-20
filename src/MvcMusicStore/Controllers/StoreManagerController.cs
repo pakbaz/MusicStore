@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
+using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
 {
@@ -17,7 +21,12 @@ namespace MvcMusicStore.Controllers
         private readonly IAlbumArtworkService albumArtworkService;
         private readonly IThumbnailCacheService thumbnailCacheService;
         private readonly IWebHostEnvironment environment;
+        private readonly BlobServiceClient blobServiceClient;
+        private readonly StorageOptions storageOptions;
         private readonly ILogger<StoreManagerController> logger;
+        private readonly IPaymentService paymentService;
+
+        private const int PageSize = 20;
 
         private static readonly HashSet<string> AllowedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -28,28 +37,83 @@ namespace MvcMusicStore.Controllers
             ".webp"
         };
 
+        private static readonly HashSet<string> AllowedAudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp3",
+            ".m4a",
+            ".aac",
+            ".ogg",
+            ".oga",
+            ".wav"
+        };
+
+        private static readonly Dictionary<string, string> AudioContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".mp3"] = "audio/mpeg",
+            [".m4a"] = "audio/mp4",
+            [".aac"] = "audio/aac",
+            [".ogg"] = "audio/ogg",
+            [".oga"] = "audio/ogg",
+            [".wav"] = "audio/wav"
+        };
+
+        private const long MaxPreviewAudioBytes = 10 * 1024 * 1024;
+
         public StoreManagerController(
             MusicStoreEntities storeDb,
             IAlbumArtworkService albumArtworkService,
             IThumbnailCacheService thumbnailCacheService,
             IWebHostEnvironment environment,
-            ILogger<StoreManagerController> logger)
+            BlobServiceClient blobServiceClient,
+            IOptions<StorageOptions> storageOptions,
+            ILogger<StoreManagerController> logger,
+            IPaymentService paymentService)
         {
             db = storeDb;
             this.albumArtworkService = albumArtworkService;
             this.thumbnailCacheService = thumbnailCacheService;
             this.environment = environment;
+            this.blobServiceClient = blobServiceClient;
+            this.storageOptions = storageOptions.Value;
             this.logger = logger;
+            this.paymentService = paymentService;
         }
 
         //
         // GET: /StoreManager/
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1)
         {
-            var albums = await db.Albums.ToListAsync();
+            if (page < 1)
+            {
+                page = 1;
+            }
+
+            var totalResults = await db.Albums.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalResults / (double)PageSize);
+            if (totalPages > 0 && page > totalPages)
+            {
+                page = totalPages;
+            }
+
+            // Order and page in the query so the admin list does not materialize the whole
+            // Albums container. Cosmos default indexing supports single-property ORDER BY.
+            var albums = await db.Albums
+                .OrderBy(a => a.Price)
+                .Skip((page - 1) * PageSize)
+                .Take(PageSize)
+                .ToListAsync();
             albums.PopulateNavigation();
-            return View(albums.OrderBy(a => a.Price).ToList());
+
+            var viewModel = new StoreManagerIndexViewModel
+            {
+                Albums = albums,
+                Page = page,
+                PageSize = PageSize,
+                TotalResults = totalResults
+            };
+
+            return View(viewModel);
         }
 
         //
@@ -79,9 +143,10 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Create
 
         [HttpPost]
-        public async Task<IActionResult> Create(Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
+        public async Task<IActionResult> Create(Album album, IFormFile? thumbnailFile, IFormFile? previewAudioFile, CancellationToken cancellationToken)
         {
             ValidateThumbnailFile(thumbnailFile);
+            ValidatePreviewAudioFile(previewAudioFile);
 
             if (ModelState.IsValid)
             {
@@ -93,6 +158,13 @@ namespace MvcMusicStore.Controllers
                 {
                     album.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(album.ArtistId, album.Title, cancellationToken);
                 }
+
+                if (previewAudioFile is { Length: > 0 })
+                {
+                    album.PreviewUrl = await SavePreviewAudioAsync(previewAudioFile, cancellationToken);
+                }
+
+                album.PreviewDurationSeconds = NormalizePreviewDuration(album.PreviewDurationSeconds);
 
                 album.AlbumId = await db.NextAlbumIdAsync(cancellationToken);
                 await ApplyDenormalizedNamesAsync(album, cancellationToken);
@@ -124,7 +196,7 @@ namespace MvcMusicStore.Controllers
         // POST: /StoreManager/Edit/5
 
         [HttpPost]
-        public async Task<IActionResult> Edit(int id, Album album, IFormFile? thumbnailFile, CancellationToken cancellationToken)
+        public async Task<IActionResult> Edit(int id, Album album, IFormFile? thumbnailFile, IFormFile? previewAudioFile, CancellationToken cancellationToken)
         {
             if (id != album.AlbumId)
             {
@@ -138,6 +210,7 @@ namespace MvcMusicStore.Controllers
             }
 
             ValidateThumbnailFile(thumbnailFile);
+            ValidatePreviewAudioFile(previewAudioFile);
 
             if (ModelState.IsValid)
             {
@@ -146,6 +219,7 @@ namespace MvcMusicStore.Controllers
                 existingAlbum.Title = album.Title;
                 existingAlbum.Price = album.Price;
                 existingAlbum.AlbumArtUrl = album.AlbumArtUrl;
+                existingAlbum.PreviewDurationSeconds = NormalizePreviewDuration(album.PreviewDurationSeconds);
 
                 if (thumbnailFile is { Length: > 0 })
                 {
@@ -156,6 +230,11 @@ namespace MvcMusicStore.Controllers
                          Album.IsPlaceholderThumbnailUrl(existingAlbum.AlbumArtUrl))
                 {
                     existingAlbum.MetadataThumbnailUrl = await TryFetchMetadataThumbnailAsync(existingAlbum.ArtistId, existingAlbum.Title, cancellationToken);
+                }
+
+                if (previewAudioFile is { Length: > 0 })
+                {
+                    existingAlbum.PreviewUrl = await SavePreviewAudioAsync(previewAudioFile, cancellationToken);
                 }
 
                 await ApplyDenormalizedNamesAsync(existingAlbum, cancellationToken);
@@ -194,6 +273,121 @@ namespace MvcMusicStore.Controllers
                 await db.SaveChangesAsync(cancellationToken);
             }
             return RedirectToAction("Index");
+        }
+
+        //
+        // GET: /StoreManager/Reviews
+
+        public async Task<IActionResult> Reviews(string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            const int pageSize = 20;
+            var normalizedFilter = ReviewModerationFilters.Normalize(filter);
+
+            var reviews = await db.Reviews.ToListAsync(cancellationToken);
+            var reportedCount = reviews.Count(r => r.IsReported && !r.IsHidden);
+
+            IEnumerable<Review> filtered = normalizedFilter switch
+            {
+                ReviewModerationFilters.Reported => reviews.Where(r => r.IsReported),
+                ReviewModerationFilters.Hidden => reviews.Where(r => r.IsHidden),
+                _ => reviews
+            };
+
+            var ordered = filtered
+                // Surface reported, still-visible reviews first so admins can act on them quickly.
+                .OrderByDescending(r => r.IsReported && !r.IsHidden)
+                .ThenByDescending(r => r.UpdatedDate ?? r.CreatedDate)
+                .ToList();
+
+            var totalResults = ordered.Count;
+            var totalPages = totalResults == 0 ? 1 : (int)Math.Ceiling(totalResults / (double)pageSize);
+            var currentPage = Math.Clamp(page, 1, totalPages);
+
+            var items = ordered
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new ReviewModerationItemViewModel
+                {
+                    ReviewId = r.ReviewId,
+                    AlbumId = r.AlbumId,
+                    AlbumTitle = string.IsNullOrWhiteSpace(r.AlbumTitle) ? $"Album #{r.AlbumId}" : r.AlbumTitle!,
+                    Author = string.IsNullOrWhiteSpace(r.Username) ? "Anonymous" : r.Username!,
+                    Rating = r.Rating,
+                    Body = r.Body,
+                    CreatedDate = r.CreatedDate,
+                    UpdatedDate = r.UpdatedDate,
+                    IsHidden = r.IsHidden,
+                    IsReported = r.IsReported,
+                    ReportReason = r.ReportReason
+                })
+                .ToList();
+
+            return View(new ReviewModerationViewModel
+            {
+                Filter = normalizedFilter,
+                Page = currentPage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ReportedCount = reportedCount,
+                Reviews = items
+            });
+        }
+
+        //
+        // POST: /StoreManager/HideReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> HideReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            await SetReviewVisibilityAsync(id, hidden: true, cancellationToken);
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        //
+        // POST: /StoreManager/UnhideReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnhideReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            await SetReviewVisibilityAsync(id, hidden: false, cancellationToken);
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        //
+        // POST: /StoreManager/DeleteReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            var review = await db.Reviews.SingleOrDefaultAsync(r => r.ReviewId == id, cancellationToken);
+            if (review != null)
+            {
+                db.Reviews.Remove(review);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        private async Task SetReviewVisibilityAsync(int id, bool hidden, CancellationToken cancellationToken)
+        {
+            var review = await db.Reviews.SingleOrDefaultAsync(r => r.ReviewId == id, cancellationToken);
+            if (review == null)
+            {
+                return;
+            }
+
+            review.IsHidden = hidden;
+            if (!hidden)
+            {
+                // Clearing the report keeps an un-hidden review out of the "needs attention" queue.
+                review.IsReported = false;
+                review.ReportReason = null;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
         }
 
         private async Task PopulateSelectListsAsync(int? genreId = null, int? artistId = null)
@@ -252,6 +446,63 @@ namespace MvcMusicStore.Controllers
             return $"~/Images/Uploads/{fileName}";
         }
 
+        private static int NormalizePreviewDuration(int durationSeconds)
+        {
+            return durationSeconds <= 0
+                ? Album.DefaultPreviewDurationSeconds
+                : Math.Clamp(durationSeconds, 5, 60);
+        }
+
+        private static string ResolveAudioExtension(IFormFile audioFile)
+        {
+            var extension = Path.GetExtension(audioFile.FileName);
+            return string.IsNullOrWhiteSpace(extension) ? string.Empty : extension;
+        }
+
+        private void ValidatePreviewAudioFile(IFormFile? previewAudioFile)
+        {
+            if (previewAudioFile is null || previewAudioFile.Length == 0)
+            {
+                return;
+            }
+
+            if (previewAudioFile.Length > MaxPreviewAudioBytes)
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Preview audio must be 10 MB or smaller.");
+            }
+
+            var extension = ResolveAudioExtension(previewAudioFile);
+            if (!AllowedAudioExtensions.Contains(extension))
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Upload a valid audio file (.mp3, .m4a, .aac, .ogg, .wav).");
+            }
+
+            if (!previewAudioFile.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError(nameof(previewAudioFile), "Upload a valid audio content type.");
+            }
+        }
+
+        private async Task<string> SavePreviewAudioAsync(IFormFile previewAudioFile, CancellationToken cancellationToken)
+        {
+            var extension = ResolveAudioExtension(previewAudioFile);
+            var contentType = AudioContentTypes.TryGetValue(extension, out var resolved) ? resolved : "audio/mpeg";
+
+            var containerClient = blobServiceClient.GetBlobContainerClient(storageOptions.MusicContainer);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+
+            var blobName = $"{Guid.NewGuid():N}{extension}";
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            await using var stream = previewAudioFile.OpenReadStream();
+            await blobClient.UploadAsync(
+                stream,
+                new BlobUploadOptions { HttpHeaders = new BlobHttpHeaders { ContentType = contentType } },
+                cancellationToken);
+
+            return "/media/music/" + blobName;
+        }
+
         private async Task<string?> TryFetchMetadataThumbnailAsync(int artistId, string? albumTitle, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(albumTitle))
@@ -284,6 +535,53 @@ namespace MvcMusicStore.Controllers
                 logger.LogWarning(ex, "Timed out while fetching metadata artwork for album '{AlbumTitle}' by '{ArtistName}'.", albumTitle, artistName);
                 return null;
             }
+        }
+
+        //
+        // GET: /StoreManager/Orders
+
+        public async Task<IActionResult> Orders()
+        {
+            var orders = await db.Orders.ToListAsync();
+            return View(orders.OrderByDescending(o => o.OrderDate).ToList());
+        }
+
+        //
+        // POST: /StoreManager/RefundOrder
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RefundOrder(int id)
+        {
+            var order = (await db.Orders.Where(o => o.OrderId == id).Take(1).ToListAsync()).FirstOrDefault();
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            if (order.PaymentStatus != PaymentStatus.Paid)
+            {
+                TempData["OrderError"] = $"Order {id} can't be refunded because it isn't in a paid state.";
+                return RedirectToAction(nameof(Orders));
+            }
+
+            // Only call the provider for real (Stripe) payments; promo/FREE orders are reversed locally.
+            if (string.Equals(order.PaymentProvider, "Stripe", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(order.PaymentIntentId))
+            {
+                var result = await paymentService.RefundAsync(order.PaymentIntentId);
+                if (!result.Success)
+                {
+                    TempData["OrderError"] = $"Refund failed for order {id}: {result.Error}";
+                    return RedirectToAction(nameof(Orders));
+                }
+            }
+
+            order.PaymentStatus = PaymentStatus.Refunded;
+            await db.SaveChangesAsync();
+
+            TempData["OrderMessage"] = $"Order {id} has been refunded.";
+            return RedirectToAction(nameof(Orders));
         }
     }
 }

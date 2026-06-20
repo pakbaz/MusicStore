@@ -1,0 +1,11 @@
+@model int
+
+<li class="loyalty-nav-item">
+    <a id="loyalty-summary-link"
+       href="@Url.Action("Rewards", "Account")"
+       title="View your rewards"
+       aria-label="Rewards: @Model points">
+        <span class="glyphicon glyphicon-star" aria-hidden="true"></span>
+        Rewards (<span id="loyalty-summary-points">@Model</span>)
+    </a>
+</li>

@@ -1,6 +1,13 @@
 ﻿@model MvcMusicStore.ViewModels.CatalogIndexViewModel
 @{
-    ViewBag.Title = "Store Catalog";
+    ViewBag.Title = "Catalog";
+    ViewBag.Seo = new SeoMetadata
+    {
+        Title = "Browse the music catalog",
+        Description = "Browse and buy albums across genres on MVC Music Store. " +
+            "Filter by genre, price, and availability, preview tracks, and add favorites to your cart.",
+        OgType = "website"
+    };
 }
 
 <section class="content-section" aria-label="Store catalog filters">
@@ -41,6 +48,7 @@
             <label class="sr-only" for="sort">Sort</label>
             <select class="form-control" id="sort" name="sort">
                 <option value="popularity_desc" selected="@(Model.Sort == "popularity_desc")">Popularity</option>
+                <option value="rating_desc" selected="@(Model.Sort == "rating_desc")">Top rated</option>
                 <option value="release_desc" selected="@(Model.Sort == "release_desc")">Release date (newest)</option>
                 <option value="release_asc" selected="@(Model.Sort == "release_asc")">Release date (oldest)</option>
                 <option value="price_asc" selected="@(Model.Sort == "price_asc")">Price (low to high)</option>
@@ -69,12 +77,15 @@
             @foreach (var album in Model.Albums)
             {
                 <li>
-                    <a href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                    <a href="@Url.AlbumUrl(album.AlbumId, album.Title)">
                         <img alt="@album.Title" src="@Url.Content(album.AlbumArtUrl)" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
                         <h2 class="h5">@album.Title</h2>
                     </a>
                     <small class="text-muted">@album.ArtistName</small>
                     <small class="text-muted">@album.GenreName · @album.Price.ToString("C")</small>
+                    <div class="album-card-rating">
+                        @await Html.PartialAsync("_StarRating", new MvcMusicStore.ViewModels.StarRatingViewModel { Average = album.AverageRating, Count = album.ReviewCount })
+                    </div>
                     <small class="text-muted">Released: @(album.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</small>
                     @if (album.IsAvailable)
                     {
@@ -84,11 +95,36 @@
                     {
                         <span class="label label-default">Out of stock</span>
                     }
+                    @if (album.HasPreview)
+                    {
+                        @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                        {
+                            PreviewUrl = album.PreviewUrl!,
+                            DurationSeconds = album.PreviewDurationSeconds,
+                            Title = album.Title,
+                            Variant = "card"
+                        })
+                    }
                     <div class="catalog-item-actions">
                         @await Component.InvokeAsync("WishlistButton", new { albumId = album.AlbumId })
                     </div>
                 </li>
             }
         </ul>
+    }
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="catalog-pagination" aria-label="Catalog pagination">
+            @if (Model.HasPreviousPage)
+            {
+                <a class="btn btn-default" rel="prev" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page - 1 })">Previous</a>
+            }
+            <span class="text-muted">Page @Model.Page of @Model.TotalPages</span>
+            @if (Model.HasNextPage)
+            {
+                <a class="btn btn-default" rel="next" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page + 1 })">Next</a>
+            }
+        </nav>
     }
 </section>

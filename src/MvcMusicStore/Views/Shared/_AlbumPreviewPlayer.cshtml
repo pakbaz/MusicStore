@@ -1,0 +1,32 @@
+@model MvcMusicStore.ViewModels.AudioPreviewViewModel
+
+@{
+    var variant = string.Equals(Model.Variant, "card", System.StringComparison.OrdinalIgnoreCase) ? "card" : "detail";
+    var seconds = Model.DurationSeconds > 0 ? Model.DurationSeconds : MvcMusicStore.Models.Album.DefaultPreviewDurationSeconds;
+    var trackTitle = string.IsNullOrWhiteSpace(Model.Title) ? "this track" : Model.Title;
+    var label = "Audio preview" + (string.IsNullOrWhiteSpace(Model.Title) ? "" : " of " + Model.Title);
+}
+
+<div class="audio-preview audio-preview--@variant" role="group" aria-label="@label"
+     data-title="@trackTitle" data-preview-seconds="@seconds">
+    <button type="button" class="audio-preview-toggle" data-role="toggle"
+            aria-pressed="false" aria-label="Play preview of @trackTitle">
+        <span class="glyphicon glyphicon-play" aria-hidden="true"></span>
+    </button>
+
+    <input type="range" class="audio-preview-scrubber" data-role="scrubber"
+           min="0" max="@seconds" value="0" step="0.1"
+           aria-label="Seek within preview of @trackTitle" aria-valuetext="0:00 of @seconds seconds" />
+
+    <span class="audio-preview-time" aria-hidden="true">
+        <span data-role="current">0:00</span> / <span data-role="duration">0:00</span>
+    </span>
+
+    <span class="audio-preview-badge" aria-hidden="true">Preview</span>
+
+    <audio data-role="audio" preload="none" src="@Url.Content(Model.PreviewUrl)">
+        Your browser does not support the audio element.
+    </audio>
+
+    <span class="sr-only" role="status" aria-live="polite" data-role="status"></span>
+</div>

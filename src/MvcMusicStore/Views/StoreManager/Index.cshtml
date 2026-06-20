@@ -1,4 +1,4 @@
-﻿@model IEnumerable<MvcMusicStore.Models.Album>
+@model MvcMusicStore.ViewModels.StoreManagerIndexViewModel
 
 @functions {
     string Truncate(string? input, int length)
@@ -17,35 +17,25 @@
 
 <p>
     @Html.ActionLink("Create New", "Create")
+    &nbsp;|&nbsp;
+    @Html.ActionLink("Manage Orders", "Orders")
+    &nbsp;|&nbsp;
+    @Html.ActionLink("Manage reviews", "Reviews")
 </p>
 <table class="table">
     <tr>
-        <th>
-            @Html.DisplayNameFor(model => model.Genre!.Name)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.Artist!.Name)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.Title)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.Price)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.ReleaseDate)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.IsAvailable)
-        </th>
-        <th>
-            @Html.DisplayNameFor(model => model.IsFeatured)
-        </th>
+        <th>Genre</th>
+        <th>Artist</th>
+        <th>Title</th>
+        <th>Price</th>
+        <th>Release Date</th>
+        <th>Available</th>
+        <th>Featured Release</th>
         <th>Thumbnail</th>
         <th></th>
     </tr>
 
-    @foreach (var item in Model)
+    @foreach (var item in Model.Albums)
     {
         <tr>
             <td>
@@ -81,3 +71,18 @@
     }
 
 </table>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="store-manager-pagination" aria-label="Catalog pagination">
+        @if (Model.HasPreviousPage)
+        {
+            <a class="btn btn-default" rel="prev" href="@Url.Action("Index", "StoreManager", new { page = Model.Page - 1 })">Previous</a>
+        }
+        <span class="text-muted">Page @Model.Page of @Model.TotalPages (@Model.TotalResults albums)</span>
+        @if (Model.HasNextPage)
+        {
+            <a class="btn btn-default" rel="next" href="@Url.Action("Index", "StoreManager", new { page = Model.Page + 1 })">Next</a>
+        }
+    </nav>
+}

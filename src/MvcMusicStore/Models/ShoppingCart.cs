@@ -106,7 +106,14 @@ namespace MvcMusicStore.Models
 
         public async Task EmptyCartAsync()
         {
-            var cartItems = await _db.Carts.Where(cart => cart.CartId == ShoppingCartId).ToListAsync();
+            await EmptyCartForUserAsync(ShoppingCartId);
+        }
+
+        // Empties the cart for a specific cart id (username once logged in). Usable outside an
+        // HTTP request/session context, e.g. from the Stripe webhook handler.
+        public async Task EmptyCartForUserAsync(string cartId)
+        {
+            var cartItems = await _db.Carts.Where(cart => cart.CartId == cartId).ToListAsync();
 
             foreach (var cartItem in cartItems)
             {
@@ -135,10 +142,23 @@ namespace MvcMusicStore.Models
 
         public async Task<int> CreateOrderAsync(Order order)
         {
+            await BuildOrderAsync(order);
+
+            // Empty the shopping cart
+            await EmptyCartAsync();
+
+            // Return the OrderId as the confirmation number
+            return order.OrderId;
+        }
+
+        // Populates the order's line items and total from the current cart WITHOUT emptying it.
+        // Used by the payment flow so the cart survives a failed/cancelled payment.
+        public async Task<int> BuildOrderAsync(Order order)
+        {
             decimal orderTotal = 0;
 
             var cartItems = await GetCartItemsAsync();
-            order.OrderDetails ??= new List<OrderDetail>();
+            order.OrderDetails = new List<OrderDetail>();
 
             // Load the catalog albums backing the cart so each line can capture the album's
             // current title, art, and audio (download) URL as a stable snapshot. Albums are
@@ -176,13 +196,19 @@ namespace MvcMusicStore.Models
                 orderTotal += (item.Count * item.AlbumPrice);
 
                 order.OrderDetails.Add(orderDetail);
+
+                // Maintain the denormalized popularity counter so the catalog can sort by
+                // popularity without scanning the Orders container on every request. Reuse the
+                // album already loaded for this line (a tracked entity) so the increment is
+                // persisted by the caller's SaveChangesAsync without an extra query.
+                if (album != null)
+                {
+                    album.Popularity += item.Count;
+                }
             }
 
             // Set the order's total to the orderTotal count
             order.Total = orderTotal;
-
-            // Empty the shopping cart
-            await EmptyCartAsync();
 
             // Return the OrderId as the confirmation number
             return order.OrderId;
