@@ -21,6 +21,17 @@ namespace MvcMusicStore.Models
 
         /// <summary>Signature of the cart contents at the last reminder, used to avoid duplicate nudges.</summary>
         public string? LastRemindedCartSignature { get; set; }
+
+        // Loyalty rewards state.
+        public int LoyaltyPoints { get; set; }
+        public decimal LifetimeSpend { get; set; }
+        public int LifetimePointsEarned { get; set; }
+        public bool HasMadePurchase { get; set; }
+
+        // Referral program state.
+        public string? ReferralCode { get; set; }
+        public string? ReferredByCode { get; set; }
+        public bool ReferralRewardGranted { get; set; }
     }
 
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>

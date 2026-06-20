@@ -29,6 +29,11 @@ builder.Services.Configure<StorageOptions>(
 builder.Services.Configure<MusicGenOptions>(
     builder.Configuration.GetSection(MusicGenOptions.SectionName));
 
+// Loyalty rewards + referral program.
+builder.Services.Configure<LoyaltyOptions>(
+    builder.Configuration.GetSection(LoyaltyOptions.SectionName));
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
+
 // Shared managed-identity credential. A single instance is reused for Blob Storage and both
 // Cosmos DbContexts so EF Core caches one internal service provider instead of building a new
 // one per request (which triggers ManyServiceProvidersCreatedWarning and fails after 20).

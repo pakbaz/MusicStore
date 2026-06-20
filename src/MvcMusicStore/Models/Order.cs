@@ -63,6 +63,16 @@ namespace MvcMusicStore.Models
         [ScaffoldColumn(false)]
         public decimal Total { get; set; }
 
+        // Loyalty rewards applied to this order. Set server-side (never model-bound).
+        [ScaffoldColumn(false)]
+        public int LoyaltyPointsRedeemed { get; set; }
+
+        [ScaffoldColumn(false)]
+        public decimal LoyaltyDiscount { get; set; }
+
+        [ScaffoldColumn(false)]
+        public int LoyaltyPointsEarned { get; set; }
+
         // Gift-card / gifting fields. These are populated server-side (they are not part of the
         // [Bind] list above, so they are never model-bound from the checkout address form).
         [ScaffoldColumn(false)]

@@ -68,6 +68,9 @@ namespace MvcMusicStore.Models
 
         [Display(Name = "Email me newsletters and new-release announcements")]
         public bool SubscribeToNewsletter { get; set; }
+
+        [Display(Name = "Referral code")]
+        public string? ReferralCode { get; set; }
     }
 
     public class EmailPreferencesViewModel
