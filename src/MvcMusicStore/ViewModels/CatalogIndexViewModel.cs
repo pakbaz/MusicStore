@@ -52,6 +52,9 @@ namespace MvcMusicStore.ViewModels
         public DateTime? ReleaseDate { get; set; }
         public bool IsAvailable { get; set; }
         public int Popularity { get; set; }
+        public string? PreviewUrl { get; set; }
+        public int PreviewDurationSeconds { get; set; }
+        public bool HasPreview => !string.IsNullOrWhiteSpace(PreviewUrl);
     }
 
     public class CatalogIndexViewModel

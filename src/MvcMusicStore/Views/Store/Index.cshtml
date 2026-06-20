@@ -84,6 +84,16 @@
                     {
                         <span class="label label-default">Out of stock</span>
                     }
+                    @if (album.HasPreview)
+                    {
+                        @await Html.PartialAsync("_AlbumPreviewPlayer", new MvcMusicStore.ViewModels.AudioPreviewViewModel
+                        {
+                            PreviewUrl = album.PreviewUrl!,
+                            DurationSeconds = album.PreviewDurationSeconds,
+                            Title = album.Title,
+                            Variant = "card"
+                        })
+                    }
                 </li>
             }
         </ul>
