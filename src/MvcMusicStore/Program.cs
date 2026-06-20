@@ -98,6 +98,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         options.Password.RequireLowercase = false;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddUserStore<CosmosUserStore>()
     .AddDefaultTokenProviders();
 
 // Configure cookie authentication

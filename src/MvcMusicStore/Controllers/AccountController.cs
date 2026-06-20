@@ -127,6 +127,87 @@ namespace MvcMusicStore.Controllers
         }
 
         //
+        // GET: /Account/RegisterFromOrder
+        // Optional post-purchase account creation reached from the checkout confirmation page.
+        // OrderId + Token identify the just-placed guest order to link once the account is created.
+        [AllowAnonymous]
+        public IActionResult RegisterFromOrder(int orderId, string? token, string? email)
+        {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Complete", "Checkout", new { id = orderId });
+            }
+
+            return View(new GuestOrderRegisterViewModel
+            {
+                OrderId = orderId,
+                Token = token,
+                UserName = email,
+            });
+        }
+
+        //
+        // POST: /Account/RegisterFromOrder
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterFromOrder(GuestOrderRegisterViewModel model)
+        {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Complete", "Checkout", new { id = model.OrderId });
+            }
+
+            if (ModelState.IsValid)
+            {
+                var user = new ApplicationUser
+                {
+                    UserName = model.UserName,
+                    Email = model.UserName,
+                    EmailMarketingOptIn = false,
+                    AbandonedCartOptIn = true,
+                    UnsubscribeToken = Guid.NewGuid().ToString("N"),
+                };
+                var result = await _userManager.CreateAsync(user, model.Password!);
+                if (result.Succeeded)
+                {
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    await MigrateShoppingCartAsync(user.UserName!);
+                    await LinkGuestOrderAsync(model.OrderId, model.Token, user.UserName!);
+                    return RedirectToAction("Complete", "Checkout", new { id = model.OrderId });
+                }
+                else
+                {
+                    AddErrors(result);
+                }
+            }
+
+            // If we got this far, something failed, redisplay form
+            return View(model);
+        }
+
+        // Links a guest order to a freshly created account, but only when the supplied token
+        // matches the order's guest access token (prevents claiming arbitrary orders).
+        private async Task LinkGuestOrderAsync(int orderId, string? token, string userName)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                return;
+            }
+
+            var storeDb = HttpContext.RequestServices.GetRequiredService<MusicStoreEntities>();
+            var order = await storeDb.Orders.FirstOrDefaultAsync(o => o.OrderId == orderId);
+            if (order == null || !string.Equals(order.GuestAccessToken, token, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            order.Username = userName;
+            order.GuestAccessToken = null;
+            await storeDb.SaveChangesAsync();
+        }
+
+        //
         // POST: /Account/Disassociate
         [HttpPost]
         [ValidateAntiForgeryToken]

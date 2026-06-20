@@ -1,0 +1,49 @@
+@model MvcMusicStore.Models.GuestOrderRegisterViewModel
+@{
+    ViewBag.Title = "Create your account";
+}
+
+<h2>@ViewBag.Title</h2>
+
+<p>Save your details and downloads by creating an account for order <strong>#@Model.OrderId</strong>.</p>
+
+@using (Html.BeginForm("RegisterFromOrder", "Account", FormMethod.Post, new { @class = "form-horizontal", role = "form" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.OrderId)
+    @Html.HiddenFor(m => m.Token)
+    <hr />
+    @Html.ValidationSummary(true, "", new { @class = "text-danger", role = "alert" })
+    <div class="form-group">
+        @Html.LabelFor(m => m.UserName, new { @class = "col-md-2 control-label" })
+        <div class="col-md-10">
+            @Html.TextBoxFor(m => m.UserName, new { @class = "form-control", @autocomplete = "username" })
+            @Html.ValidationMessageFor(m => m.UserName, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(m => m.Password, new { @class = "col-md-2 control-label" })
+        <div class="col-md-10">
+            @Html.PasswordFor(m => m.Password, new { @class = "form-control", @autocomplete = "new-password" })
+            @Html.ValidationMessageFor(m => m.Password, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(m => m.ConfirmPassword, new { @class = "col-md-2 control-label" })
+        <div class="col-md-10">
+            @Html.PasswordFor(m => m.ConfirmPassword, new { @class = "form-control", @autocomplete = "new-password" })
+            @Html.ValidationMessageFor(m => m.ConfirmPassword, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-2 col-md-10">
+            <input type="submit" class="btn btn-primary" value="Create account" />
+            <a class="btn btn-default" href="@Url.Action("Complete", "Checkout", new { id = Model.OrderId, token = Model.Token })">Skip for now</a>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+}
