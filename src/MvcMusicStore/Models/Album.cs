@@ -65,6 +65,18 @@ namespace MvcMusicStore.Models
         [StringLength(1024)]
         public string? AudioUrl { get; set; }
 
+        [DisplayName("Preview Audio URL")]
+        [StringLength(1024)]
+        public string? PreviewUrl { get; set; }
+
+        [DisplayName("Preview Length (seconds)")]
+        [Range(5, 60)]
+        public int PreviewDurationSeconds { get; set; } = DefaultPreviewDurationSeconds;
+
+        public const int DefaultPreviewDurationSeconds = 30;
+
+        public bool HasPreview => !string.IsNullOrWhiteSpace(PreviewUrl);
+
         [DisplayName("Metadata Thumbnail URL")]
         [StringLength(1024)]
         public string? MetadataThumbnailUrl { get; set; }

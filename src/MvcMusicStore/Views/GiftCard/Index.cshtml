@@ -1,0 +1,102 @@
+@model MvcMusicStore.ViewModels.MyGiftCardsViewModel
+@{
+    ViewBag.Title = "My Gift Cards";
+
+    string TypeLabel(MvcMusicStore.Models.GiftCardTransaction t) =>
+        t.Type == MvcMusicStore.Models.GiftCardTransactionTypes.Redeemed ? "Redeemed" : "Issued";
+}
+
+<h2>My Gift Cards</h2>
+<p class="section-subtitle">Track the gift cards you've sent, check balances, and review redemption history.</p>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h3>Check a balance</h3>
+    </div>
+    @using (Html.BeginForm("Balance", "GiftCard", FormMethod.Post, new { @class = "form-inline gift-balance-form", role = "form" }))
+    {
+        @Html.AntiForgeryToken()
+        <div class="form-group">
+            <label class="sr-only" for="code">Gift card code</label>
+            <input type="text" id="code" name="code" class="form-control" placeholder="GIFT-XXXX-XXXX-XXXX" value="@Model.LookupCode" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn btn-default">Check balance</button>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.LookupError))
+    {
+        <div class="alert alert-warning" role="alert">@Model.LookupError</div>
+    }
+    else if (Model.LookupResult != null)
+    {
+        <div class="alert alert-success" role="status">
+            Gift card <strong>@Model.LookupResult.Code</strong> has a balance of
+            <strong>@Model.LookupResult.Balance.ToString("C")</strong>
+            (originally @Model.LookupResult.InitialAmount.ToString("C")).
+        </div>
+    }
+</section>
+
+<section class="content-section">
+    <div class="section-heading">
+        <h3>Gift cards you've sent</h3>
+    </div>
+
+    @if (Model.PurchasedCards.Count == 0)
+    {
+        <p class="section-subtitle">You haven't sent any gift cards yet.</p>
+        <p><a class="btn btn-primary" href="@Url.Action("Buy", "GiftCard")">Buy a gift card</a></p>
+    }
+    else
+    {
+        foreach (var card in Model.PurchasedCards)
+        {
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <strong>@card.Code</strong>
+                    <span class="pull-right">Balance: <strong>@card.Balance.ToString("C")</strong> / @card.InitialAmount.ToString("C")</span>
+                </div>
+                <div class="panel-body">
+                    <dl class="dl-horizontal">
+                        <dt>Recipient</dt>
+                        <dd>@(string.IsNullOrWhiteSpace(card.RecipientName) ? card.RecipientEmail : $"{card.RecipientName} ({card.RecipientEmail})")</dd>
+                        <dt>Sent</dt>
+                        <dd>@card.CreatedDate.ToString("g")</dd>
+                        <dt>Status</dt>
+                        <dd>@(card.Balance > 0 ? "Active" : "Fully redeemed")</dd>
+                    </dl>
+
+                    <h4>Redemption history</h4>
+                    <table class="table table-striped table-condensed">
+                        <caption class="sr-only">Transactions for gift card @card.Code</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Date</th>
+                                <th scope="col">Type</th>
+                                <th scope="col" class="text-right">Amount</th>
+                                <th scope="col" class="text-right">Balance after</th>
+                                <th scope="col">Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in card.Transactions.OrderBy(t => t.Date))
+                            {
+                                <tr>
+                                    <td>@t.Date.ToString("g")</td>
+                                    <td>@TypeLabel(t)</td>
+                                    <td class="text-right">@t.Amount.ToString("C")</td>
+                                    <td class="text-right">@t.BalanceAfter.ToString("C")</td>
+                                    <td>@(t.OrderId.HasValue ? $"Order #{t.OrderId}" : t.Note)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</section>
+
+<p>
+    <a class="btn btn-primary" href="@Url.Action("Buy", "GiftCard")">Buy a gift card</a>
+</p>
