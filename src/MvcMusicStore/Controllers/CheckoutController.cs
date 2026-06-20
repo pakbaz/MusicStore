@@ -14,7 +14,6 @@ namespace MvcMusicStore.Controllers
         private readonly MusicStoreEntities storeDB;
         private readonly IOrderEmailSender emailSender;
         private readonly ILogger<CheckoutController> logger;
-        const string PromoCode = "FREE";
 
         public CheckoutController(
             MusicStoreEntities storeDb,
@@ -47,17 +46,12 @@ namespace MvcMusicStore.Controllers
         [HttpPost]
         public async Task<IActionResult> AddressAndPayment(Order order)
         {
+            // Promo codes are optional and informational only for now; preserve any entered
+            // value when redisplaying the form. Real validation/discounts are tracked separately.
+            ViewBag.PromoCode = Request.Form["PromoCode"].ToString();
+
             if (!ModelState.IsValid)
                 return View(order);
-
-            // Check promo code from form
-            var promoCode = Request.Form["PromoCode"].ToString();
-            if (!string.Equals(promoCode, PromoCode, StringComparison.OrdinalIgnoreCase))
-            {
-                ViewBag.PromoCode = promoCode;
-                ModelState.AddModelError("PromoCode", "Please enter the valid promo code to place your order.");
-                return View(order);
-            }
 
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
             if (await cart.GetCountAsync() == 0)
@@ -99,18 +93,17 @@ namespace MvcMusicStore.Controllers
         public async Task<IActionResult> Complete(int id)
         {
             // Validate customer owns this order. Cosmos cannot translate AnyAsync() (EXISTS subquery),
-            // so materialize a single matching id with Take(1) instead.
-            IQueryable<Order> orders = storeDB.Orders;
-            var matchingOrder = await orders
+            // so materialize a single matching order with Take(1) instead. Owned OrderDetails are
+            // part of the same document, so they load with the order for the confirmation summary.
+            var matchingOrders = await storeDB.Orders
                 .Where(o => o.OrderId == id && o.Username == User.Identity!.Name)
-                .Select(o => o.OrderId)
                 .Take(1)
                 .ToListAsync();
-            bool isValid = matchingOrder.Count != 0;
+            var order = matchingOrders.FirstOrDefault();
 
-            if (isValid)
+            if (order != null)
             {
-                return View(id);
+                return View(order);
             }
 
             ViewBag.ErrorMessage = "We couldn't find that order for your account. Please review your recent orders or try checkout again.";
