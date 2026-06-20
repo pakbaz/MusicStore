@@ -14,6 +14,7 @@ namespace MvcMusicStore.Models
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<Review>    Reviews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -59,6 +60,12 @@ namespace MvcMusicStore.Models
                 });
             });
 
+            modelBuilder.Entity<Review>(b =>
+            {
+                b.ToContainer("Reviews");
+                b.HasKey(r => r.ReviewId);
+            });
+
             // The Azure Cosmos DB provider does not support index definitions; strip any conventional indexes.
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
@@ -96,6 +103,12 @@ namespace MvcMusicStore.Models
         public async Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 1 : ids.Max() + 1;
+        }
+
+        public async Task<int> NextReviewIdAsync(CancellationToken cancellationToken = default)
+        {
+            var ids = await Reviews.Select(r => r.ReviewId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 1 : ids.Max() + 1;
         }
     }

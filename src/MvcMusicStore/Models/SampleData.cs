@@ -13,23 +13,106 @@ namespace MvcMusicStore.Models
             // ("SELECT ... FROM root c") that Cosmos rejects with "Identifier 'root' could not be
             // resolved", so test for existing data with a Take(1) materialization instead.
             var alreadySeeded = (await context.Genres.Select(g => g.GenreId).Take(1).ToListAsync()).Count != 0;
-            if (alreadySeeded)
+            if (!alreadySeeded)
+            {
+                const string imgUrl = "~/Images/placeholder.svg";
+
+                var genres = AddGenres(context);
+                var artists = AddArtists(context);
+
+                // Cosmos uses client-assigned int keys (ValueGenerated.Never), so every Album must have
+                // a unique AlbumId assigned BEFORE it is tracked. Build the albums in a detached list,
+                // assign keys + denormalized fields, then AddRange so no two entities collide on key 0.
+                var albums = BuildAlbums(imgUrl, genres, artists);
+                AssignAlbumKeys(albums);
+                AddAlbumCatalogMetadata(albums);
+                context.Albums.AddRange(albums);
+
+                await context.SaveChangesAsync();
+            }
+
+            // Seed sample reviews independently so existing databases also gain social proof on the
+            // next startup. Seeded reviews are demo data and intentionally bypass the purchase gate.
+            await SeedReviewsAsync(context);
+        }
+
+        private static async Task SeedReviewsAsync(MusicStoreEntities context)
+        {
+            var reviewsExist = (await context.Reviews.Select(r => r.ReviewId).Take(1).ToListAsync()).Count != 0;
+            if (reviewsExist)
+            {
                 return;
+            }
 
-            const string imgUrl = "~/Images/placeholder.svg";
+            var albums = await context.Albums.ToListAsync();
+            if (albums.Count == 0)
+            {
+                return;
+            }
 
-            var genres = AddGenres(context);
-            var artists = AddArtists(context);
+            var random = new Random(2024);
+            string[] reviewers =
+            {
+                "ava.harmon", "liam.beats", "noah.vinyl", "mia.tracks", "ethan.audio",
+                "sofia.notes", "lucas.reverb", "emma.encore", "oliver.tempo", "isla.melody"
+            };
+            string[] snippets =
+            {
+                "On constant repeat since I bought it. Worth every penny.",
+                "Production is crisp and the low end hits hard on good headphones.",
+                "A grower - the back half of the record is the best part.",
+                "Solid front to back, though a couple of tracks drag.",
+                "Exactly the vibe I was after. Highly recommend.",
+                "Great musicianship, but the mastering feels a little loud.",
+                "Nostalgic and fresh at the same time. Love it.",
+                "Not my favorite from this artist, but still enjoyable.",
+                "The kind of album you put on and let run all the way through.",
+                "Fantastic songwriting and the chorus hooks are unreal."
+            };
 
-            // Cosmos uses client-assigned int keys (ValueGenerated.Never), so every Album must have
-            // a unique AlbumId assigned BEFORE it is tracked. Build the albums in a detached list,
-            // assign keys + denormalized fields, then AddRange so no two entities collide on key 0.
-            var albums = BuildAlbums(imgUrl, genres, artists);
-            AssignAlbumKeys(albums);
-            AddAlbumCatalogMetadata(albums);
-            context.Albums.AddRange(albums);
+            var reviews = new List<Review>();
+            var reviewId = 1;
 
-            await context.SaveChangesAsync();
+            foreach (var album in albums.OrderBy(a => a.AlbumId))
+            {
+                // Leave roughly a third of the catalog without reviews so "no ratings yet" states
+                // and the rating sort remain meaningful.
+                if (random.NextDouble() < 0.3)
+                {
+                    continue;
+                }
+
+                var reviewCount = random.Next(1, 5);
+                var pickedReviewers = reviewers
+                    .OrderBy(_ => random.Next())
+                    .Take(reviewCount)
+                    .ToList();
+
+                foreach (var reviewer in pickedReviewers)
+                {
+                    // Skew positive (3-5 stars) so averages look like a healthy storefront.
+                    var rating = random.Next(3, 6);
+                    var includeBody = random.NextDouble() < 0.8;
+                    var created = DateTime.UtcNow.AddDays(-random.Next(1, 240));
+
+                    reviews.Add(new Review
+                    {
+                        ReviewId = reviewId++,
+                        AlbumId = album.AlbumId,
+                        AlbumTitle = album.Title,
+                        Username = reviewer,
+                        Rating = rating,
+                        Body = includeBody ? snippets[random.Next(snippets.Length)] : null,
+                        CreatedDate = created
+                    });
+                }
+            }
+
+            if (reviews.Count > 0)
+            {
+                context.Reviews.AddRange(reviews);
+                await context.SaveChangesAsync();
+            }
         }
 
         private static void AssignAlbumKeys(List<Album> albums)

@@ -1,0 +1,141 @@
+@model MvcMusicStore.ViewModels.ReviewModerationViewModel
+@{
+    ViewBag.Title = "Moderate reviews";
+
+    (string key, string label)[] filters = new[]
+    {
+        (MvcMusicStore.ViewModels.ReviewModerationFilters.All, "All"),
+        (MvcMusicStore.ViewModels.ReviewModerationFilters.Reported, $"Reported ({Model.ReportedCount})"),
+        (MvcMusicStore.ViewModels.ReviewModerationFilters.Hidden, "Hidden")
+    };
+}
+
+<h2>Moderate reviews</h2>
+<p>
+    @Html.ActionLink("Back to catalog admin", "Index")
+</p>
+
+<ul class="nav nav-pills review-moderation-filters">
+    @foreach (var (key, label) in filters)
+    {
+        <li class="@(Model.Filter == key ? "active" : null)">
+            <a href="@Url.Action("Reviews", new { filter = key })">@label</a>
+        </li>
+    }
+</ul>
+
+<p class="text-muted">@Model.TotalResults review(s)</p>
+
+@if (Model.Reviews.Count == 0)
+{
+    <div class="alert alert-info">No reviews match this filter.</div>
+}
+else
+{
+    <table class="table review-moderation-table">
+        <thead>
+            <tr>
+                <th>Album</th>
+                <th>Author</th>
+                <th>Rating</th>
+                <th>Review</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var review in Model.Reviews)
+            {
+                <tr class="@(review.IsReported && !review.IsHidden ? "review-row-reported" : null)">
+                    <td>
+                        @Html.ActionLink(review.AlbumTitle, "Details", "Store", new { id = review.AlbumId }, null)
+                    </td>
+                    <td>@review.Author</td>
+                    <td>
+                        @await Html.PartialAsync("_StarRating", new MvcMusicStore.ViewModels.StarRatingViewModel { Average = review.Rating, Count = 0, ShowCount = false })
+                    </td>
+                    <td class="review-moderation-body">
+                        @if (string.IsNullOrWhiteSpace(review.Body))
+                        {
+                            <span class="text-muted">(rating only)</span>
+                        }
+                        else
+                        {
+                            <span>@review.Body</span>
+                        }
+                        @if (review.IsReported && !string.IsNullOrWhiteSpace(review.ReportReason))
+                        {
+                            <span class="review-report-reason text-muted">Reason: @review.ReportReason</span>
+                        }
+                    </td>
+                    <td>
+                        <time datetime="@review.CreatedDate.ToString("yyyy-MM-dd")">@review.CreatedDate.ToString("MMM d, yyyy")</time>
+                        @if (review.UpdatedDate.HasValue)
+                        {
+                            <span class="text-muted">(edited)</span>
+                        }
+                    </td>
+                    <td>
+                        @if (review.IsHidden)
+                        {
+                            <span class="label label-default">Hidden</span>
+                        }
+                        @if (review.IsReported)
+                        {
+                            <span class="label label-warning">Reported</span>
+                        }
+                        @if (!review.IsHidden && !review.IsReported)
+                        {
+                            <span class="label label-success">Visible</span>
+                        }
+                    </td>
+                    <td class="review-moderation-actions">
+                        @if (review.IsHidden)
+                        {
+                            <form asp-action="UnhideReview" method="post" class="review-moderation-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@review.ReviewId" />
+                                <input type="hidden" name="filter" value="@Model.Filter" />
+                                <input type="hidden" name="page" value="@Model.Page" />
+                                <button type="submit" class="btn btn-default btn-sm">Unhide</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form asp-action="HideReview" method="post" class="review-moderation-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@review.ReviewId" />
+                                <input type="hidden" name="filter" value="@Model.Filter" />
+                                <input type="hidden" name="page" value="@Model.Page" />
+                                <button type="submit" class="btn btn-warning btn-sm">Hide</button>
+                            </form>
+                        }
+                        <form asp-action="DeleteReview" method="post" class="review-moderation-form" onsubmit="return confirm('Permanently remove this review?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@review.ReviewId" />
+                            <input type="hidden" name="filter" value="@Model.Filter" />
+                            <input type="hidden" name="page" value="@Model.Page" />
+                            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="review-pagination" aria-label="Review pages">
+            @if (Model.Page > 1)
+            {
+                <a class="btn btn-default btn-sm" href="@Url.Action("Reviews", new { filter = Model.Filter, page = Model.Page - 1 })">Previous</a>
+            }
+            <span class="review-pagination-status">Page @Model.Page of @Model.TotalPages</span>
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a class="btn btn-default btn-sm" href="@Url.Action("Reviews", new { filter = Model.Filter, page = Model.Page + 1 })">Next</a>
+            }
+        </nav>
+    }
+}

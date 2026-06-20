@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
+using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
 {
@@ -194,6 +195,121 @@ namespace MvcMusicStore.Controllers
                 await db.SaveChangesAsync(cancellationToken);
             }
             return RedirectToAction("Index");
+        }
+
+        //
+        // GET: /StoreManager/Reviews
+
+        public async Task<IActionResult> Reviews(string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            const int pageSize = 20;
+            var normalizedFilter = ReviewModerationFilters.Normalize(filter);
+
+            var reviews = await db.Reviews.ToListAsync(cancellationToken);
+            var reportedCount = reviews.Count(r => r.IsReported && !r.IsHidden);
+
+            IEnumerable<Review> filtered = normalizedFilter switch
+            {
+                ReviewModerationFilters.Reported => reviews.Where(r => r.IsReported),
+                ReviewModerationFilters.Hidden => reviews.Where(r => r.IsHidden),
+                _ => reviews
+            };
+
+            var ordered = filtered
+                // Surface reported, still-visible reviews first so admins can act on them quickly.
+                .OrderByDescending(r => r.IsReported && !r.IsHidden)
+                .ThenByDescending(r => r.UpdatedDate ?? r.CreatedDate)
+                .ToList();
+
+            var totalResults = ordered.Count;
+            var totalPages = totalResults == 0 ? 1 : (int)Math.Ceiling(totalResults / (double)pageSize);
+            var currentPage = Math.Clamp(page, 1, totalPages);
+
+            var items = ordered
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new ReviewModerationItemViewModel
+                {
+                    ReviewId = r.ReviewId,
+                    AlbumId = r.AlbumId,
+                    AlbumTitle = string.IsNullOrWhiteSpace(r.AlbumTitle) ? $"Album #{r.AlbumId}" : r.AlbumTitle!,
+                    Author = string.IsNullOrWhiteSpace(r.Username) ? "Anonymous" : r.Username!,
+                    Rating = r.Rating,
+                    Body = r.Body,
+                    CreatedDate = r.CreatedDate,
+                    UpdatedDate = r.UpdatedDate,
+                    IsHidden = r.IsHidden,
+                    IsReported = r.IsReported,
+                    ReportReason = r.ReportReason
+                })
+                .ToList();
+
+            return View(new ReviewModerationViewModel
+            {
+                Filter = normalizedFilter,
+                Page = currentPage,
+                TotalPages = totalPages,
+                TotalResults = totalResults,
+                ReportedCount = reportedCount,
+                Reviews = items
+            });
+        }
+
+        //
+        // POST: /StoreManager/HideReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> HideReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            await SetReviewVisibilityAsync(id, hidden: true, cancellationToken);
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        //
+        // POST: /StoreManager/UnhideReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnhideReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            await SetReviewVisibilityAsync(id, hidden: false, cancellationToken);
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        //
+        // POST: /StoreManager/DeleteReview/5
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteReview(int id, string? filter, int page = 1, CancellationToken cancellationToken = default)
+        {
+            var review = await db.Reviews.SingleOrDefaultAsync(r => r.ReviewId == id, cancellationToken);
+            if (review != null)
+            {
+                db.Reviews.Remove(review);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            return RedirectToAction(nameof(Reviews), new { filter, page });
+        }
+
+        private async Task SetReviewVisibilityAsync(int id, bool hidden, CancellationToken cancellationToken)
+        {
+            var review = await db.Reviews.SingleOrDefaultAsync(r => r.ReviewId == id, cancellationToken);
+            if (review == null)
+            {
+                return;
+            }
+
+            review.IsHidden = hidden;
+            if (!hidden)
+            {
+                // Clearing the report keeps an un-hidden review out of the "needs attention" queue.
+                review.IsReported = false;
+                review.ReportReason = null;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
         }
 
         private async Task PopulateSelectListsAsync(int? genreId = null, int? artistId = null)

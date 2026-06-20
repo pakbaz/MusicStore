@@ -2,7 +2,7 @@
 
 An upgraded ASP.NET Core MVC version of the classic MVC Music Store sample, running on .NET 10 with Azure Cosmos DB, private Azure Blob Storage media, ASP.NET Core Identity, and an optional ACE-Step text-to-music generation service.
 
-The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, administration, sign-in, shopping cart, checkout, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
+The app is still a lightweight sample store that sells music albums online, but it now includes a modern dark-first storefront, searchable catalog, verified-purchaser ratings and reviews, administration, sign-in, shopping cart, checkout, metadata artwork enrichment, and an AI Music flow that can generate original instrumental tracks and publish them back into the catalog.
 
 ## Screenshots
 
@@ -82,6 +82,7 @@ flowchart LR
 | --- | --- | --- |
 | Web app | `src/MvcMusicStore/Program.cs` | Registers MVC, EF Core Cosmos contexts, Identity, sessions, Blob Storage, HTTP clients, hosted workers, and the default MVC route. |
 | Storefront | `HomeController`, `StoreController`, Razor views | Home page sections, catalog search/filter/sort, genre browsing, album details, and artist pages. |
+| Ratings and reviews | `ReviewsController`, `StoreController`, `StoreManagerController` | Verified-purchaser star ratings and written reviews, average rating + count on catalog and album details, rating sort, paginated reviews, user reporting, and admin hide/remove moderation. |
 | Shopping and checkout | `ShoppingCartController`, `CheckoutController`, `ShoppingCart` | Session-based cart identity, persisted cart rows, order creation, and order detail ownership. |
 | Administration | `StoreManagerController` | Administrator-only CRUD for albums plus custom thumbnail uploads and metadata artwork lookup. |
 | Authentication | `AccountController`, `ApplicationDbContext` | ASP.NET Core Identity users, roles, claims, logins, and tokens stored in Cosmos containers. |
@@ -96,7 +97,7 @@ The application uses EF Core's Azure Cosmos DB provider for both catalog data an
 
 | Container family | Entities |
 | --- | --- |
-| Catalog | `Albums`, `Genres`, `Artists`, `Carts`, `Orders` |
+| Catalog | `Albums`, `Genres`, `Artists`, `Carts`, `Orders`, `Reviews` |
 | Identity | `Identity_Users`, `Identity_Roles`, `Identity_UserClaims`, `Identity_UserRoles`, `Identity_UserLogins`, `Identity_RoleClaims`, `Identity_UserTokens` |
 
 Catalog entities denormalize display fields such as artist name, genre name, album art URL, release date, availability, and generated audio URL so storefront pages can render from Cosmos without relational joins. Orders own their order details as embedded data.
