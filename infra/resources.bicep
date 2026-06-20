@@ -336,6 +336,13 @@ resource webContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: 'https://${musicgenContainerApp.properties.configuration.ingress.fqdn}'
             }
             {
+              // Public base URL used to build absolute links in store emails (unsubscribe, cart, orders).
+              // Configure Email__Provider=Acs plus Email__Endpoint/FromAddress (and grant the managed
+              // identity an ACS sender role) to switch from the default log-only provider. See README.
+              name: 'Email__BaseUrl'
+              value: 'https://${webContainerAppName}.${containerAppsEnvironment.properties.defaultDomain}'
+            }
+            {
               name: 'AZURE_CLIENT_ID'
               value: userAssignedIdentity.properties.clientId
             }

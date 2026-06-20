@@ -90,7 +90,7 @@
 
 @if (Model.Bundles.Count > 0)
 {
-    <section class="content-section">
+    <div class="content-section">
         <div class="section-heading">
             <h2>Complete the set</h2>
             <p class="section-subtitle">Bundle @Model.Album.Title with more music and save.</p>
@@ -101,12 +101,12 @@
                 <partial name="_BundleCard" model="bundle" />
             }
         </div>
-    </section>
+    </div>
 }
 
 @if (Model.AlsoBought.Count > 0)
 {
-    <section class="content-section">
+    <div class="content-section">
         <div class="section-heading">
             <h2>Customers also bought</h2>
         </div>
@@ -129,7 +129,7 @@
                 </article>
             }
         </div>
-    </section>
+    </div>
 }
 
 <section class="content-section">
