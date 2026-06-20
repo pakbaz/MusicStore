@@ -105,4 +105,19 @@
             }
         </ul>
     }
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="catalog-pagination" aria-label="Catalog pagination">
+            @if (Model.HasPreviousPage)
+            {
+                <a class="btn btn-default" rel="prev" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page - 1 })">Previous</a>
+            }
+            <span class="text-muted">Page @Model.Page of @Model.TotalPages</span>
+            @if (Model.HasNextPage)
+            {
+                <a class="btn btn-default" rel="next" href="@Url.Action("Index", "Store", new { search = Model.Search, genre = Model.Genre, minPrice = Model.MinPrice, maxPrice = Model.MaxPrice, availability = Model.Availability, sort = Model.Sort, page = Model.Page + 1 })">Next</a>
+            }
+        </nav>
+    }
 </section>

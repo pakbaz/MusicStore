@@ -114,6 +114,11 @@ namespace MvcMusicStore.Models
         [DisplayName("Available")]
         public bool IsAvailable { get; set; } = true;
 
+        // Denormalized cumulative units sold, maintained at checkout so the catalog can sort by
+        // popularity without scanning the Orders container on every request.
+        [ScaffoldColumn(false)]
+        public int Popularity { get; set; }
+
         public virtual Genre? Genre { get; set; }
         public virtual Artist? Artist { get; set; }
         public virtual List<OrderDetail>? OrderDetails { get; set; }
