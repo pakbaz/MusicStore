@@ -224,11 +224,54 @@ static async Task SeedDatabaseAsync(WebApplication app)
         // Initialize id counters from the current max once, at startup, so id allocation never
         // scans the catalog containers on the insert path.
         await musicStoreDb.EnsureSequencesInitializedAsync();
+
+        // Materialize the denormalized Album.Popularity counter from existing orders so popularity
+        // sorting works for catalogs created before the counter existed. Startup-only, never per request.
+        await BackfillAlbumPopularityAsync(musicStoreDb);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
+static async Task BackfillAlbumPopularityAsync(MusicStoreEntities db)
+{
+    // Skip cheaply when there are no orders to aggregate (Cosmos can't translate AnyAsync/EXISTS,
+    // so materialize a single id instead).
+    var hasOrders = (await db.Orders.Select(o => o.OrderId).Take(1).ToListAsync()).Count != 0;
+    if (!hasOrders)
+    {
+        return;
+    }
+
+    var orders = await db.Orders.ToListAsync();
+    var salesByAlbum = orders
+        .SelectMany(order => order.OrderDetails ?? new List<OrderDetail>())
+        .GroupBy(detail => detail.AlbumId)
+        .ToDictionary(group => group.Key, group => group.Sum(detail => detail.Quantity));
+
+    if (salesByAlbum.Count == 0)
+    {
+        return;
+    }
+
+    var albums = await db.Albums.ToListAsync();
+    var changed = false;
+    foreach (var album in albums)
+    {
+        var sold = salesByAlbum.TryGetValue(album.AlbumId, out var quantity) ? quantity : 0;
+        if (album.Popularity != sold)
+        {
+            album.Popularity = sold;
+            changed = true;
+        }
+    }
+
+    if (changed)
+    {
+        await db.SaveChangesAsync();
     }
 }
 
