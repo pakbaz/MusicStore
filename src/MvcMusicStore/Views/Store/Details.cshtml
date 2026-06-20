@@ -93,6 +93,50 @@
     </div>
 </article>
 
+@if (Model.Bundles.Count > 0)
+{
+    <div class="content-section">
+        <div class="section-heading">
+            <h2>Complete the set</h2>
+            <p class="section-subtitle">Bundle @Model.Album.Title with more music and save.</p>
+        </div>
+        <div class="bundle-grid">
+            @foreach (var bundle in Model.Bundles)
+            {
+                <partial name="_BundleCard" model="bundle" />
+            }
+        </div>
+    </div>
+}
+
+@if (Model.AlsoBought.Count > 0)
+{
+    <div class="content-section">
+        <div class="section-heading">
+            <h2>Customers also bought</h2>
+        </div>
+        <div class="album-grid">
+            @foreach (var album in Model.AlsoBought)
+            {
+                <article class="album-card">
+                    <a class="album-card-link" href="@Url.Action("Details", "Store", new { id = album.AlbumId })">
+                        <img alt="@album.Title" src="@Url.Content(album.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+                        <div class="album-card-body">
+                            <h3 class="album-title">@album.Title</h3>
+                            <p class="album-price">@album.Artist?.Name</p>
+                        </div>
+                    </a>
+                    <div class="album-card-actions">
+                        <a class="btn btn-default btn-block" href="@Url.Action("AddToCart", "ShoppingCart", new { id = album.AlbumId })" aria-label="Add @album.Title to cart">
+                            <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span> Add to cart
+                        </a>
+                    </div>
+                </article>
+            }
+        </div>
+    </div>
+}
+
 @{
     var reviews = Model.Reviews;
 }

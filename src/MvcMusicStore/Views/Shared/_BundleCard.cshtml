@@ -1,0 +1,41 @@
+@model MvcMusicStore.Models.Bundle
+@{
+    var ajaxAdd = ViewData["AjaxAdd"] as bool? ?? false;
+}
+
+<article class="bundle-card">
+    <a class="bundle-card-link" href="@Url.Action("Details", "Bundles", new { id = Model.BundleId })">
+        <div class="bundle-card-art">
+            <img alt="@Model.Title" src="@Url.Content(Model.GetDisplayThumbnailUrl())" data-fallback-src="@Url.Content(MvcMusicStore.Models.Album.DefaultPlaceholderThumbnailUrl)" />
+            @if (Model.Savings > 0)
+            {
+                <span class="bundle-badge">Save @Model.Savings.ToString("C")</span>
+            }
+        </div>
+        <div class="bundle-card-body">
+            <h3 class="bundle-title">@Model.Title</h3>
+            <p class="bundle-meta">@Model.AlbumCount albums@(Model.SavingsPercent > 0 ? $" · {Model.SavingsPercent}% off" : string.Empty)</p>
+            <p class="bundle-pricing">
+                <span class="bundle-price">@Model.BundlePrice.ToString("C")</span>
+                @if (Model.Savings > 0)
+                {
+                    <span class="bundle-regular">@Model.RegularPrice.ToString("C")</span>
+                }
+            </p>
+        </div>
+    </a>
+    <div class="bundle-card-actions">
+        @if (ajaxAdd)
+        {
+            <button type="button" class="btn btn-primary btn-block js-add-bundle" data-id="@Model.BundleId" aria-label="Add @Model.Title bundle to cart">
+                <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span> Add bundle
+            </button>
+        }
+        else
+        {
+            <a class="btn btn-primary btn-block" href="@Url.Action("AddBundleToCart", "ShoppingCart", new { id = Model.BundleId })" aria-label="Add @Model.Title bundle to cart">
+                <span class="glyphicon glyphicon-shopping-cart" aria-hidden="true"></span> Add bundle
+            </a>
+        }
+    </div>
+</article>

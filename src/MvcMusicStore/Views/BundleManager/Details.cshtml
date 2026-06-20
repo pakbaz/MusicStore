@@ -1,0 +1,42 @@
+@model MvcMusicStore.Models.Bundle
+@{
+    ViewBag.Title = "Bundle details";
+}
+
+<h2>@Model.Title</h2>
+
+<dl class="dl-horizontal">
+    <dt>Description</dt>
+    <dd>@(string.IsNullOrWhiteSpace(Model.Description) ? "—" : Model.Description)</dd>
+    <dt>Albums</dt>
+    <dd>@Model.AlbumCount</dd>
+    <dt>Regular price</dt>
+    <dd>@Model.RegularPrice.ToString("C")</dd>
+    <dt>Bundle price</dt>
+    <dd>@Model.BundlePrice.ToString("C")</dd>
+    <dt>Savings</dt>
+    <dd>@Model.Savings.ToString("C") (@Model.SavingsPercent%)</dd>
+    <dt>Active</dt>
+    <dd>@(Model.IsActive ? "Yes" : "No")</dd>
+    <dt>Created</dt>
+    <dd>@Model.DateCreated.ToString("yyyy-MM-dd")</dd>
+</dl>
+
+<table class="table">
+    <tr>
+        <th>Album</th>
+        <th>Price</th>
+    </tr>
+    @foreach (var item in Model.Items)
+    {
+        <tr>
+            <td>@item.AlbumTitle</td>
+            <td>@item.AlbumPrice.ToString("C")</td>
+        </tr>
+    }
+</table>
+
+<p>
+    @Html.ActionLink("Edit", "Edit", new { id = Model.BundleId }) |
+    @Html.ActionLink("Back to list", "Index")
+</p>

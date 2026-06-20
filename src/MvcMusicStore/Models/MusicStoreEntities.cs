@@ -10,6 +10,7 @@ namespace MvcMusicStore.Models
         private const string ArtistCounter = "Artists";
         private const string OrderCounter = "Orders";
         private const string CartCounter = "Carts";
+        private const string BundleCounter = "Bundles";
 
         private readonly CosmosCatalogOptions _catalogOptions;
         private CosmosSequenceGenerator? _sequences;
@@ -34,6 +35,7 @@ namespace MvcMusicStore.Models
         public DbSet<Artist>    Artists { get; set; }
         public DbSet<Cart>      Carts { get; set; }
         public DbSet<Order>     Orders { get; set; }
+        public DbSet<Bundle>    Bundles { get; set; }
         public DbSet<Review>    Reviews { get; set; }
         public DbSet<GiftCard>  GiftCards { get; set; }
         public DbSet<AlbumGift> Gifts { get; set; }
@@ -69,6 +71,14 @@ namespace MvcMusicStore.Models
                 b.ToContainer("Carts");
                 b.HasKey(c => c.RecordId);
                 b.Ignore(c => c.Album);
+                b.OwnsMany(c => c.BundleItems);
+            });
+
+            modelBuilder.Entity<Bundle>(b =>
+            {
+                b.ToContainer("Bundles");
+                b.HasKey(x => x.BundleId);
+                b.OwnsMany(x => x.Items);
             });
 
             modelBuilder.Entity<Order>(b =>
@@ -127,6 +137,9 @@ namespace MvcMusicStore.Models
         public Task<int> NextCartRecordIdAsync(CancellationToken cancellationToken = default)
             => Sequences.NextAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
 
+        public Task<int> NextBundleIdAsync(CancellationToken cancellationToken = default)
+            => Sequences.NextAsync(BundleCounter, MaxBundleIdAsync, cancellationToken);
+
         // Initializes every id counter from the current max in a single pass. Intended to run at
         // startup (after seeding) so the one-time MAX scan stays off the request/insert path; once
         // the counters exist this is just cheap point reads.
@@ -137,6 +150,7 @@ namespace MvcMusicStore.Models
             await Sequences.EnsureInitializedAsync(ArtistCounter, MaxArtistIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(OrderCounter, MaxOrderIdAsync, cancellationToken);
             await Sequences.EnsureInitializedAsync(CartCounter, MaxCartRecordIdAsync, cancellationToken);
+            await Sequences.EnsureInitializedAsync(BundleCounter, MaxBundleIdAsync, cancellationToken);
         }
 
         private async Task<int> MaxAlbumIdAsync(CancellationToken cancellationToken)
@@ -166,6 +180,12 @@ namespace MvcMusicStore.Models
         private async Task<int> MaxCartRecordIdAsync(CancellationToken cancellationToken)
         {
             var ids = await Carts.Select(c => c.RecordId).ToListAsync(cancellationToken);
+            return ids.Count == 0 ? 0 : ids.Max();
+        }
+
+        private async Task<int> MaxBundleIdAsync(CancellationToken cancellationToken)
+        {
+            var ids = await Bundles.Select(b => b.BundleId).ToListAsync(cancellationToken);
             return ids.Count == 0 ? 0 : ids.Max();
         }
 

@@ -1,7 +1,7 @@
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
+using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
 
 namespace MvcMusicStore.Controllers
@@ -9,85 +9,117 @@ namespace MvcMusicStore.Controllers
     public class ShoppingCartController : Controller
     {
         private readonly MusicStoreEntities storeDB;
+        private readonly IRecommendationService recommendationService;
+        private readonly IBundleService bundleService;
 
-        public ShoppingCartController(MusicStoreEntities storeDb)
+        public ShoppingCartController(
+            MusicStoreEntities storeDb,
+            IRecommendationService recommendationService,
+            IBundleService bundleService)
         {
             storeDB = storeDb;
+            this.recommendationService = recommendationService;
+            this.bundleService = bundleService;
         }
 
-        //
         // GET: /ShoppingCart/
-
         public async Task<IActionResult> Index()
         {
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-
-            // Set up our ViewModel
-            var viewModel = new ShoppingCartViewModel
-            {
-                CartItems = await cart.GetCartItemsAsync(),
-                CartTotal = await cart.GetTotalAsync()
-            };
-
+            var viewModel = await BuildCartViewModelAsync(cart);
             ViewBag.CartMessage = TempData["CartMessage"];
-
-            // Return the view
             return View(viewModel);
         }
 
-        //
         // GET: /ShoppingCart/AddToCart/5
-
         public async Task<IActionResult> AddToCart(int id)
         {
-            // Retrieve the album from the database
-            var addedAlbum = await storeDB.Albums
-                .SingleAsync(album => album.AlbumId == id);
+            var addedAlbum = await storeDB.Albums.SingleAsync(album => album.AlbumId == id);
 
-            // Add it to the shopping cart
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-
             await cart.AddToCartAsync(addedAlbum);
-
             await storeDB.SaveChangesAsync();
 
-            // Go back to the main store page for more shopping
             return RedirectToAction("Index");
         }
 
-        //
-        // AJAX: /ShoppingCart/RemoveFromCart/5
+        // GET: /ShoppingCart/AddBundleToCart/5
+        public async Task<IActionResult> AddBundleToCart(int id)
+        {
+            var bundle = await bundleService.GetBundleAsync(id);
+            if (bundle == null || !bundle.IsActive)
+            {
+                return NotFound();
+            }
 
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            await cart.AddBundleToCartAsync(bundle);
+            await storeDB.SaveChangesAsync();
+
+            TempData["CartMessage"] = $"Added the \u201c{bundle.Title}\u201d bundle to your cart.";
+            return RedirectToAction("Index");
+        }
+
+        // POST: /ShoppingCart/AddToCartAjax
+        [HttpPost]
+        public async Task<IActionResult> AddToCartAjax(int id)
+        {
+            var album = await storeDB.Albums.SingleOrDefaultAsync(a => a.AlbumId == id);
+            if (album == null)
+            {
+                return NotFound("Album not found.");
+            }
+
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            await cart.AddToCartAsync(album);
+            await storeDB.SaveChangesAsync();
+
+            var viewModel = await BuildCartViewModelAsync(cart, $"{album.Title} has been added to your cart.");
+            return PartialView("_CartContents", viewModel);
+        }
+
+        // POST: /ShoppingCart/AddBundleToCartAjax
+        [HttpPost]
+        public async Task<IActionResult> AddBundleToCartAjax(int id)
+        {
+            var bundle = await bundleService.GetBundleAsync(id);
+            if (bundle == null || !bundle.IsActive)
+            {
+                return NotFound("Bundle not found.");
+            }
+
+            var cart = ShoppingCart.GetCart(storeDB, HttpContext);
+            await cart.AddBundleToCartAsync(bundle);
+            await storeDB.SaveChangesAsync();
+
+            var viewModel = await BuildCartViewModelAsync(cart, $"Added the \u201c{bundle.Title}\u201d bundle to your cart.");
+            return PartialView("_CartContents", viewModel);
+        }
+
+        // POST: /ShoppingCart/RemoveFromCart/5
         [HttpPost]
         public async Task<IActionResult> RemoveFromCart(int id)
         {
-            // Retrieve the current user's shopping cart
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
-
             var cartItem = (await cart.GetCartItemsAsync()).SingleOrDefault(item => item.RecordId == id);
             if (cartItem == null)
             {
                 return NotFound("Cart item not found.");
             }
 
-            var albumName = cartItem.Album?.Title ?? "This album";
-
-            // Remove from cart
-            int itemCount = await cart.RemoveFromCartAsync(id);
-
+            var itemName = cartItem.DisplayTitle;
+            var itemCount = await cart.RemoveFromCartAsync(id);
             await storeDB.SaveChangesAsync();
 
-            var itemSubtotal = itemCount > 0
-                ? (cartItem.Album?.Price ?? decimal.Zero) * itemCount
-                : decimal.Zero;
-
             var message = itemCount > 0
-                ? $"1 copy of {albumName} has been removed from your shopping cart."
-                : $"{albumName} has been removed from your shopping cart.";
+                ? $"1 copy of {itemName} has been removed from your shopping cart."
+                : $"{itemName} has been removed from your shopping cart.";
 
-            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
+            var viewModel = await BuildCartViewModelAsync(cart, message);
+            return PartialView("_CartContents", viewModel);
         }
 
+        // POST: /ShoppingCart/UpdateCart
         [HttpPost]
         public async Task<IActionResult> UpdateCart(int id, int count)
         {
@@ -98,44 +130,57 @@ namespace MvcMusicStore.Controllers
 
             var cart = ShoppingCart.GetCart(storeDB, HttpContext);
             var cartItem = (await cart.GetCartItemsAsync()).SingleOrDefault(item => item.RecordId == id);
-
             if (cartItem == null)
             {
                 return NotFound("Cart item not found.");
             }
 
-            var albumName = cartItem.Album?.Title ?? "This album";
-            var unitPrice = cartItem.Album?.Price ?? decimal.Zero;
+            var itemName = cartItem.DisplayTitle;
             var itemCount = await cart.UpdateCartItemCountAsync(id, count);
-
             await storeDB.SaveChangesAsync();
 
-            var itemSubtotal = unitPrice * itemCount;
             var message = itemCount == 0
-                ? $"{albumName} has been removed from your shopping cart."
-                : $"{albumName} quantity has been updated to {itemCount}.";
+                ? $"{itemName} has been removed from your shopping cart."
+                : $"{itemName} quantity has been updated to {itemCount}.";
 
-            return Json(await BuildCartResponseAsync(cart, id, itemCount, itemSubtotal, message));
+            var viewModel = await BuildCartViewModelAsync(cart, message);
+            return PartialView("_CartContents", viewModel);
         }
 
-        private async Task<ShoppingCartRemoveViewModel> BuildCartResponseAsync(ShoppingCart cart, int id, int itemCount, decimal itemSubtotal, string message)
+        private async Task<ShoppingCartViewModel> BuildCartViewModelAsync(ShoppingCart cart, string? message = null)
         {
-            var cartItems = (await cart.GetCartItemsAsync())
-                .Where(item => item.Album != null)
-                .OrderBy(item => item.Album!.Title)
+            var items = await cart.GetCartItemsAsync();
+
+            var albumIds = items
+                .Where(item => !item.IsBundle)
+                .Select(item => item.AlbumId)
+                .Concat(items
+                    .Where(item => item.IsBundle)
+                    .SelectMany(item => (item.BundleItems ?? new List<CartBundleItem>())
+                        .Select(bundleItem => bundleItem.AlbumId)))
+                .Distinct()
                 .ToList();
 
-            var cartSummary = string.Join("\n", cartItems.Select(item => $"{item.Album!.Title} x{item.Count}"));
+            var recommendations = (await recommendationService.GetCartCrossSellAsync(albumIds)).ToList();
 
-            return new ShoppingCartRemoveViewModel
+            var bundleIdsInCart = items
+                .Where(item => item.IsBundle && item.BundleId.HasValue)
+                .Select(item => item.BundleId!.Value)
+                .ToHashSet();
+
+            var suggestedBundles = (await bundleService.GetBundlesForCartAsync(albumIds))
+                .Where(bundle => !bundleIdsInCart.Contains(bundle.BundleId))
+                .Take(3)
+                .ToList();
+
+            return new ShoppingCartViewModel
             {
-                Message = message,
+                CartItems = items,
                 CartTotal = await cart.GetTotalAsync(),
                 CartCount = await cart.GetCountAsync(),
-                ItemCount = itemCount,
-                ItemSubtotal = itemSubtotal,
-                CartSummary = cartSummary,
-                DeleteId = id
+                Recommendations = recommendations,
+                SuggestedBundles = suggestedBundles,
+                Message = message
             };
         }
     }

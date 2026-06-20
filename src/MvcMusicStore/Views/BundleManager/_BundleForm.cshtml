@@ -1,0 +1,55 @@
+@model MvcMusicStore.ViewModels.BundleEditViewModel
+
+@Html.ValidationSummary(false)
+
+<div class="form-group">
+    @Html.LabelFor(m => m.Title, new { @class = "control-label col-md-2" })
+    <div class="col-md-10">
+        @Html.TextBoxFor(m => m.Title, new { @class = "form-control" })
+        @Html.ValidationMessageFor(m => m.Title)
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.Description, new { @class = "control-label col-md-2" })
+    <div class="col-md-10">
+        @Html.TextAreaFor(m => m.Description, new { @class = "form-control", rows = 3 })
+        @Html.ValidationMessageFor(m => m.Description)
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.BundlePrice, new { @class = "control-label col-md-2" })
+    <div class="col-md-10">
+        @Html.TextBoxFor(m => m.BundlePrice, new { @class = "form-control", type = "number", step = "0.01", min = "0.01" })
+        @Html.ValidationMessageFor(m => m.BundlePrice)
+        <p class="help-block">Discounted price for the whole bundle. The regular price is the sum of the selected albums.</p>
+    </div>
+</div>
+
+<div class="form-group">
+    @Html.LabelFor(m => m.IsActive, new { @class = "control-label col-md-2" })
+    <div class="col-md-10 checkbox">
+        <label>
+            @Html.CheckBoxFor(m => m.IsActive) Visible to customers
+        </label>
+    </div>
+</div>
+
+<div class="form-group">
+    <label class="control-label col-md-2" for="SelectedAlbumIds">Albums in bundle</label>
+    <div class="col-md-10">
+        @Html.ValidationMessageFor(m => m.SelectedAlbumIds)
+        <div class="bundle-album-picker">
+            @foreach (var choice in Model.AlbumChoices)
+            {
+                <label class="bundle-album-option">
+                    <input type="checkbox" name="SelectedAlbumIds" value="@choice.AlbumId"@(Model.SelectedAlbumIds.Contains(choice.AlbumId) ? Html.Raw(" checked") : null) />
+                    <span class="bundle-album-title">@choice.Title</span>
+                    <span class="bundle-album-meta">@choice.ArtistName · @choice.Price.ToString("C")</span>
+                </label>
+            }
+        </div>
+        <p class="help-block">Select at least two albums.</p>
+    </div>
+</div>
