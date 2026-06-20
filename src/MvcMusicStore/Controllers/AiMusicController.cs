@@ -1,7 +1,4 @@
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
@@ -11,176 +8,223 @@ namespace MvcMusicStore.Controllers
 {
     public class AiMusicController : Controller
     {
-        private static readonly string[] StyleDirections =
+        private const int MinDurationSeconds = 10;
+        private const int MaxDurationSeconds = 60;
+        private const int MaxPromptLength = 600;
+
+        private static readonly IReadOnlyList<AiMusicSamplePrompt> SamplePromptLibrary =
         [
-            "Cinematic",
-            "Ambient",
-            "Minimalist",
-            "Groove-forward",
-            "Orchestral",
-            "Experimental"
+            new() { Label = "Cinematic / Uplifting", Prompt = "Uplifting cinematic orchestral piece with soaring strings, warm brass and a triumphant build, around 110 BPM" },
+            new() { Label = "Lo-fi / Chill", Prompt = "Chill lo-fi hip hop beat with warm Rhodes piano, dusty vinyl crackle, mellow bass and a relaxed head-nod groove" },
+            new() { Label = "Electronic / Energetic", Prompt = "Energetic electronic dance track with punchy synth bass, bright plucky arps and a driving four-on-the-floor beat" },
+            new() { Label = "Ambient / Dark", Prompt = "Dark ambient soundscape with deep evolving drones, icy pads and distant metallic echoes, slow and brooding" },
+            new() { Label = "Jazz / Reflective", Prompt = "Smooth late-night jazz trio with brushed drums, walking upright bass and expressive improvised piano" },
+            new() { Label = "Folk / Hopeful", Prompt = "Hopeful acoustic folk instrumental with fingerpicked guitar, gentle strings and light hand percussion" },
+            new() { Label = "Epic / Trailer", Prompt = "Epic orchestral trailer theme with thundering taiko drums, choir swells and heroic french horns" },
+            new() { Label = "Funk / Groove", Prompt = "Funky upbeat groove with slap bass, wah-wah guitar, tight horn stabs and a danceable rhythm" }
         ];
 
-        private static readonly string[] MoodOptions =
+        private static readonly (string Keyword, string Genre)[] GenreHints =
         [
-            "Uplifting",
-            "Calm",
-            "Energetic",
-            "Dark",
-            "Hopeful",
-            "Reflective"
+            ("orchestral", "Classical"), ("cinematic", "Classical"), ("symphony", "Classical"),
+            ("piano and strings", "Classical"), ("trailer", "Classical"), ("choir", "Classical"),
+            ("lo-fi", "Electronic"), ("lofi", "Electronic"), ("edm", "Electronic"), ("synth", "Electronic"),
+            ("techno", "Electronic"), ("house", "Electronic"), ("ambient", "Electronic"), ("dance", "Electronic"),
+            ("swing", "Jazz"), ("bebop", "Jazz"), ("saxophone", "Jazz"),
+            ("funk", "R&B"), ("groove", "R&B"), ("soul", "R&B"),
+            ("guitar", "Rock"), ("band", "Rock"),
+            ("folk", "Country"), ("acoustic", "Country"),
+            ("hip hop", "Rap"), ("hiphop", "Rap"), ("trap", "Rap"), ("beat", "Rap"),
+            ("heavy", "Metal"), ("thrash", "Metal"),
+            ("salsa", "Latin"), ("bossa", "Latin")
         ];
 
-        private static readonly string[] InstrumentationOptions =
-        [
-            "Synths and drums",
-            "Guitar-driven band",
-            "Piano and strings",
-            "Electronic pulse",
-            "Percussion ensemble",
-            "Hybrid orchestral"
-        ];
+        private readonly IServiceScopeFactory scopeFactory;
+        private readonly IAiMusicJobStore jobStore;
+        private readonly ILogger<AiMusicController> logger;
 
-        private readonly MusicStoreEntities db;
-        private readonly IAiMusicCreationService aiMusicCreationService;
-
-        public AiMusicController(MusicStoreEntities db, IAiMusicCreationService aiMusicCreationService)
+        public AiMusicController(
+            IServiceScopeFactory scopeFactory,
+            IAiMusicJobStore jobStore,
+            ILogger<AiMusicController> logger)
         {
-            this.db = db;
-            this.aiMusicCreationService = aiMusicCreationService;
+            this.scopeFactory = scopeFactory;
+            this.jobStore = jobStore;
+            this.logger = logger;
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
-            var model = new AiMusicGenerationRequestViewModel();
-            await PopulateSelectionListsAsync(model);
-            return View(model);
+            return View(new AiMusicGenerationRequestViewModel
+            {
+                SamplePrompts = SamplePromptLibrary
+            });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Index(AiMusicGenerationRequestViewModel model, CancellationToken cancellationToken)
+        public IActionResult Start(string? prompt, int durationSeconds)
         {
-            Genre? genre = await db.Genres.SingleOrDefaultAsync(g => g.GenreId == model.GenreId, cancellationToken);
-            if (genre == null)
+            prompt = (prompt ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(prompt))
             {
-                ModelState.AddModelError(nameof(model.GenreId), "Please choose a valid genre.");
+                return BadRequest(new { error = "Please describe the music you want to generate." });
             }
 
-            ValidateSelection(ModelState, model.StyleDirection, StyleDirections, nameof(model.StyleDirection), "Please choose a valid style direction.");
-            ValidateSelection(ModelState, model.Mood, MoodOptions, nameof(model.Mood), "Please choose a valid mood.");
-            ValidateSelection(ModelState, model.Instrumentation, InstrumentationOptions, nameof(model.Instrumentation), "Please choose valid instrumentation.");
-
-            if (!ModelState.IsValid)
+            if (prompt.Length > MaxPromptLength)
             {
-                await PopulateSelectionListsAsync(model);
-                return View(model);
+                return BadRequest(new { error = $"Please keep your description under {MaxPromptLength} characters." });
             }
+
+            int duration = Math.Clamp(durationSeconds <= 0 ? 30 : durationSeconds, MinDurationSeconds, MaxDurationSeconds);
+
+            AiMusicJob job = jobStore.Create(prompt, duration);
+            _ = Task.Run(() => RunGenerationAsync(job.Id));
+
+            return Accepted(new { jobId = job.Id });
+        }
+
+        [HttpGet]
+        public IActionResult Status(string id)
+        {
+            AiMusicJob? job = jobStore.Get(id);
+            if (job is null)
+            {
+                return NotFound(new { error = "This generation could not be found. It may have expired - please start a new one." });
+            }
+
+            int elapsedSeconds = (int)(DateTimeOffset.UtcNow - job.CreatedAt).TotalSeconds;
+
+            return Ok(new
+            {
+                status = job.Status.ToString().ToLowerInvariant(),
+                elapsedSeconds,
+                error = job.Error,
+                result = job.Status == AiMusicJobStatus.Succeeded
+                    ? new
+                    {
+                        albumId = job.AlbumId,
+                        title = job.Title,
+                        artistName = job.ArtistName,
+                        genre = job.Genre,
+                        audioUrl = job.AudioUrl,
+                        durationSeconds = job.ResultDurationSeconds,
+                        suggestedPrice = job.SuggestedPrice,
+                        suggestedPriceDisplay = job.SuggestedPrice.ToString("C"),
+                        originalityStatement = job.OriginalityStatement
+                    }
+                    : null
+            });
+        }
+
+        private async Task RunGenerationAsync(string jobId)
+        {
+            AiMusicJob? job = jobStore.Get(jobId);
+            if (job is null)
+            {
+                return;
+            }
+
+            job.Status = AiMusicJobStatus.Running;
 
             try
             {
-                AiMusicCreationResult generationResult = await aiMusicCreationService.GenerateAsync(new AiMusicCreationRequest
-                {
-                    GenreName = genre!.Name!,
-                    StyleDirection = model.StyleDirection!,
-                    Mood = model.Mood!,
-                    Instrumentation = model.Instrumentation!,
-                    TempoBpm = model.TempoBpm
-                }, cancellationToken);
+                using IServiceScope scope = scopeFactory.CreateScope();
+                IAiMusicCreationService creationService = scope.ServiceProvider.GetRequiredService<IAiMusicCreationService>();
+                MusicStoreEntities db = scope.ServiceProvider.GetRequiredService<MusicStoreEntities>();
 
-                Artist? artist = await db.Artists.SingleOrDefaultAsync(a => a.Name == generationResult.ArtistName, cancellationToken);
-                if (artist == null)
+                AiMusicCreationResult result = await creationService.GenerateAsync(new AiMusicCreationRequest
+                {
+                    Prompt = job.Prompt,
+                    DurationSeconds = job.DurationSeconds
+                });
+
+                Genre genre = await ResolveGenreAsync(db, job.Prompt);
+
+                Artist? artist = await db.Artists.SingleOrDefaultAsync(a => a.Name == result.ArtistName);
+                if (artist is null)
                 {
                     artist = new Artist
                     {
-                        ArtistId = await db.NextArtistIdAsync(cancellationToken),
-                        Name = generationResult.ArtistName
+                        ArtistId = await db.NextArtistIdAsync(),
+                        Name = result.ArtistName
                     };
                     db.Artists.Add(artist);
                 }
 
                 Album album = new()
                 {
-                    AlbumId = await db.NextAlbumIdAsync(cancellationToken),
-                    Title = generationResult.Title,
-                    GenreId = model.GenreId,
+                    AlbumId = await db.NextAlbumIdAsync(),
+                    Title = result.Title,
+                    GenreId = genre.GenreId,
                     GenreName = genre.Name,
                     ArtistId = artist.ArtistId,
                     ArtistName = artist.Name,
-                    Price = generationResult.SuggestedPrice,
-                    AlbumArtUrl = generationResult.AlbumArtUrl,
-                    AudioUrl = generationResult.AudioUrl
+                    Price = result.SuggestedPrice,
+                    AlbumArtUrl = result.AlbumArtUrl,
+                    AudioUrl = result.AudioUrl
                 };
 
                 db.Albums.Add(album);
-                await db.SaveChangesAsync(cancellationToken);
+                await db.SaveChangesAsync();
 
-                return View("Result", new AiMusicGenerationResultViewModel
-                {
-                    AlbumId = album.AlbumId,
-                    Genre = genre.Name!,
-                    StyleDirection = model.StyleDirection!,
-                    Mood = model.Mood!,
-                    Instrumentation = model.Instrumentation!,
-                    TempoBpm = model.TempoBpm,
-                    Title = generationResult.Title,
-                    ArtistName = generationResult.ArtistName,
-                    SuggestedPrice = generationResult.SuggestedPrice,
-                    OriginalityStatement = generationResult.OriginalityStatement,
-                    AudioUrl = generationResult.AudioUrl,
-                    DurationSeconds = generationResult.DurationSeconds
-                });
+                job.AlbumId = album.AlbumId;
+                job.Title = result.Title;
+                job.ArtistName = result.ArtistName;
+                job.Genre = genre.Name;
+                job.AudioUrl = result.AudioUrl;
+                job.ResultDurationSeconds = result.DurationSeconds;
+                job.SuggestedPrice = result.SuggestedPrice;
+                job.OriginalityStatement = result.OriginalityStatement;
+                job.CompletedAt = DateTimeOffset.UtcNow;
+                job.Status = AiMusicJobStatus.Succeeded;
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(nameof(model.StyleDirection), ex.Message);
-                await PopulateSelectionListsAsync(model);
-                return View(model);
+                job.Error = ex.Message;
+                job.CompletedAt = DateTimeOffset.UtcNow;
+                job.Status = AiMusicJobStatus.Failed;
+                logger.LogWarning(ex, "AI music generation rejected for job {JobId}.", jobId);
             }
-        }
-
-        private async Task PopulateSelectionListsAsync(AiMusicGenerationRequestViewModel model)
-        {
-            var genres = await db.Genres.ToListAsync();
-            model.Genres = genres
-                .OrderBy(g => g.Name)
-                .Select(g => new SelectListItem
-                {
-                    Value = g.GenreId.ToString(),
-                    Text = g.Name!,
-                    Selected = g.GenreId == model.GenreId
-                })
-                .ToList();
-
-            model.StyleDirections = BuildSelectionList(StyleDirections, model.StyleDirection);
-            model.MoodOptions = BuildSelectionList(MoodOptions, model.Mood);
-            model.InstrumentationOptions = BuildSelectionList(InstrumentationOptions, model.Instrumentation);
-        }
-
-        private static IReadOnlyList<SelectListItem> BuildSelectionList(IEnumerable<string> values, string? selectedValue)
-        {
-            return values
-                .Select(v => new SelectListItem
-                {
-                    Value = v,
-                    Text = v,
-                    Selected = string.Equals(v, selectedValue, StringComparison.Ordinal)
-                })
-                .ToList();
-        }
-
-        private static void ValidateSelection(ModelStateDictionary modelState, string? value, IEnumerable<string> validValues, string key, string errorMessage)
-        {
-            if (string.IsNullOrWhiteSpace(value))
+            catch (Exception ex)
             {
-                return;
+                job.Error = "Something went wrong while generating your track. Please try again in a moment.";
+                job.CompletedAt = DateTimeOffset.UtcNow;
+                job.Status = AiMusicJobStatus.Failed;
+                logger.LogError(ex, "Unexpected error generating AI music for job {JobId}.", jobId);
+            }
+        }
+
+        private static async Task<Genre> ResolveGenreAsync(MusicStoreEntities db, string prompt)
+        {
+            List<Genre> genres = await db.Genres.ToListAsync();
+            string lower = prompt.ToLowerInvariant();
+
+            Genre? direct = genres.FirstOrDefault(g =>
+                !string.IsNullOrEmpty(g.Name) && lower.Contains(g.Name!.ToLowerInvariant()));
+            if (direct is not null)
+            {
+                return direct;
             }
 
-            if (!validValues.Contains(value, StringComparer.Ordinal))
+            foreach ((string keyword, string genreName) in GenreHints)
             {
-                modelState.AddModelError(key, errorMessage);
+                if (lower.Contains(keyword))
+                {
+                    Genre? hinted = genres.FirstOrDefault(g =>
+                        string.Equals(g.Name, genreName, StringComparison.OrdinalIgnoreCase));
+                    if (hinted is not null)
+                    {
+                        return hinted;
+                    }
+                }
             }
+
+            return genres.FirstOrDefault(g => string.Equals(g.Name, "Electronic", StringComparison.OrdinalIgnoreCase))
+                ?? genres.FirstOrDefault()
+                ?? throw new InvalidOperationException("No genres are configured in the catalog.");
         }
     }
 }

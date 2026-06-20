@@ -4,65 +4,339 @@
     ViewBag.Title = "AI Music Creation";
 }
 
-<h2>AI Music Creation</h2>
-<p>Generate an original track concept from your chosen genre and musical direction.</p>
+<div class="ai-music">
+    <h2>AI Music Creation</h2>
+    <p class="ai-music-lead">
+        Describe the track you imagine - genre, mood, instruments, tempo, anything - and we'll
+        compose an original instrumental for you. Need inspiration? Tap a starter prompt below.
+    </p>
 
-@using (Html.BeginForm("Index", "AiMusic", FormMethod.Post))
-{
-    @Html.AntiForgeryToken()
-
-    <div class="form-horizontal">
-        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    <form id="ai-music-form" autocomplete="off">
+        @Html.AntiForgeryToken()
 
         <div class="form-group">
-            @Html.LabelFor(model => model.GenreId, new { @class = "control-label col-md-2" })
-            <div class="col-md-10">
-                @Html.DropDownListFor(model => model.GenreId, Model.Genres, "-- Select genre --", new { @class = "form-control" })
-                @Html.ValidationMessageFor(model => model.GenreId)
+            <label class="ai-music-label">Need a starting point?</label>
+            <div id="ai-sample-prompts" class="ai-sample-prompts">
+                @foreach (var sample in Model.SamplePrompts)
+                {
+                    <button type="button" class="ai-chip" data-prompt="@sample.Prompt">@sample.Label</button>
+                }
             </div>
         </div>
 
         <div class="form-group">
-            @Html.LabelFor(model => model.StyleDirection, new { @class = "control-label col-md-2" })
-            <div class="col-md-10">
-                @Html.DropDownListFor(model => model.StyleDirection, Model.StyleDirections, "-- Select style direction --", new { @class = "form-control" })
-                @Html.ValidationMessageFor(model => model.StyleDirection)
+            <label for="ai-prompt" class="ai-music-label">Describe your track</label>
+            <textarea id="ai-prompt" name="prompt" class="form-control ai-prompt" rows="4" maxlength="600"
+                      placeholder="e.g. Dreamy synthwave with nostalgic 80s pads, a steady electronic beat and a soaring lead melody"></textarea>
+            <div class="ai-prompt-meta">
+                <span id="ai-char-count">0</span>/600 characters
             </div>
         </div>
 
-        <div class="form-group">
-            @Html.LabelFor(model => model.Mood, new { @class = "control-label col-md-2" })
-            <div class="col-md-10">
-                @Html.DropDownListFor(model => model.Mood, Model.MoodOptions, "-- Select mood --", new { @class = "form-control" })
-                @Html.ValidationMessageFor(model => model.Mood)
+        <div class="form-group ai-controls-row">
+            <div class="ai-duration">
+                <label for="ai-duration" class="ai-music-label">Length</label>
+                <select id="ai-duration" name="durationSeconds" class="form-control">
+                    @foreach (var seconds in Model.DurationOptions)
+                    {
+                        if (seconds == Model.DurationSeconds)
+                        {
+                            <option value="@seconds" selected="selected">@seconds seconds</option>
+                        }
+                        else
+                        {
+                            <option value="@seconds">@seconds seconds</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="ai-generate">
+                <button type="submit" id="ai-generate-btn" class="btn btn-primary btn-lg">
+                    Generate Original Track
+                </button>
             </div>
         </div>
+    </form>
 
-        <div class="form-group">
-            @Html.LabelFor(model => model.Instrumentation, new { @class = "control-label col-md-2" })
-            <div class="col-md-10">
-                @Html.DropDownListFor(model => model.Instrumentation, Model.InstrumentationOptions, "-- Select instrumentation --", new { @class = "form-control" })
-                @Html.ValidationMessageFor(model => model.Instrumentation)
-            </div>
-        </div>
-
-        <div class="form-group">
-            @Html.LabelFor(model => model.TempoBpm, new { @class = "control-label col-md-2" })
-            <div class="col-md-10">
-                @Html.TextBoxFor(model => model.TempoBpm, new { @class = "form-control", type = "number", min = "40", max = "220" })
-                @Html.ValidationMessageFor(model => model.TempoBpm)
-            </div>
-        </div>
-
-        <div class="form-group">
-            <div class="col-md-offset-2 col-md-10">
-                <input type="submit" value="Generate Original Track" class="btn btn-primary" />
-            </div>
+    <div id="ai-progress" class="ai-panel ai-progress" hidden>
+        <div class="ai-spinner" aria-hidden="true"></div>
+        <div class="ai-progress-text">
+            <p id="ai-progress-status" class="ai-progress-status">Starting generation...</p>
+            <p class="ai-progress-elapsed">Elapsed: <span id="ai-elapsed">0:00</span></p>
+            <p class="ai-progress-note">
+                Tracks are rendered on CPU and can take 1-3 minutes, especially the first run after the
+                service has been idle. You can keep this tab open - we'll update automatically.
+            </p>
         </div>
     </div>
-}
+
+    <div id="ai-error" class="ai-panel alert alert-danger" hidden>
+        <strong>Generation failed.</strong>
+        <span id="ai-error-message"></span>
+        <div class="ai-error-actions">
+            <button type="button" id="ai-retry-btn" class="btn btn-default btn-sm">Try again</button>
+        </div>
+    </div>
+
+    <div id="ai-result" class="ai-panel ai-result" hidden>
+        <div class="ai-result-header">
+            <h3 id="ai-result-title">Your track is ready</h3>
+            <p class="ai-result-sub">
+                by <span id="ai-result-artist"></span>
+                <span class="ai-result-badges">
+                    <span class="label label-info" id="ai-result-genre"></span>
+                    <span class="label label-default" id="ai-result-price"></span>
+                </span>
+            </p>
+        </div>
+
+        <div id="ai-audio-wrap" class="ai-audio-wrap">
+            <audio id="ai-audio" controls preload="none">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+
+        <p id="ai-audio-missing" class="alert alert-warning" hidden>
+            Audio is still finalizing or was unavailable, but the track metadata has been saved to the catalog.
+        </p>
+
+        <p id="ai-originality" class="ai-originality"></p>
+
+        <div class="ai-result-actions">
+            <a id="ai-view-store" href="#" class="btn btn-success">View in Store</a>
+            <a id="ai-download" href="#" download class="btn btn-default">Download track</a>
+            <button type="button" id="ai-generate-another" class="btn btn-default">Generate another</button>
+        </div>
+    </div>
+</div>
 
 @section Scripts {
-    <script src="~/Scripts/jquery.validate.js"></script>
-    <script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+    <script>
+        (function () {
+            var form = document.getElementById('ai-music-form');
+            var promptEl = document.getElementById('ai-prompt');
+            var charCount = document.getElementById('ai-char-count');
+            var generateBtn = document.getElementById('ai-generate-btn');
+            var durationEl = document.getElementById('ai-duration');
+
+            var progressEl = document.getElementById('ai-progress');
+            var progressStatus = document.getElementById('ai-progress-status');
+            var elapsedEl = document.getElementById('ai-elapsed');
+
+            var errorEl = document.getElementById('ai-error');
+            var errorMessage = document.getElementById('ai-error-message');
+            var retryBtn = document.getElementById('ai-retry-btn');
+
+            var resultEl = document.getElementById('ai-result');
+            var resultTitle = document.getElementById('ai-result-title');
+            var resultArtist = document.getElementById('ai-result-artist');
+            var resultGenre = document.getElementById('ai-result-genre');
+            var resultPrice = document.getElementById('ai-result-price');
+            var audioEl = document.getElementById('ai-audio');
+            var audioWrap = document.getElementById('ai-audio-wrap');
+            var audioMissing = document.getElementById('ai-audio-missing');
+            var originalityEl = document.getElementById('ai-originality');
+            var viewStoreLink = document.getElementById('ai-view-store');
+            var downloadLink = document.getElementById('ai-download');
+            var generateAnother = document.getElementById('ai-generate-another');
+
+            var pollTimer = null;
+            var tickTimer = null;
+            var startedAt = 0;
+            var pollFailures = 0;
+
+            function updateCharCount() {
+                charCount.textContent = String(promptEl.value.length);
+            }
+
+            promptEl.addEventListener('input', updateCharCount);
+            updateCharCount();
+
+            document.querySelectorAll('.ai-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    promptEl.value = chip.getAttribute('data-prompt') || '';
+                    updateCharCount();
+                    promptEl.focus();
+                });
+            });
+
+            function formatElapsed(totalSeconds) {
+                var m = Math.floor(totalSeconds / 60);
+                var s = totalSeconds % 60;
+                return m + ':' + (s < 10 ? '0' + s : s);
+            }
+
+            function statusFor(seconds) {
+                if (seconds < 15) { return 'Warming up the studio...'; }
+                if (seconds < 40) { return 'Composing your track...'; }
+                if (seconds < 90) { return 'Rendering audio - this can take a couple of minutes...'; }
+                return 'Almost there - finalizing the mix...';
+            }
+
+            function startTicking() {
+                startedAt = Date.now();
+                tickTimer = setInterval(function () {
+                    var seconds = Math.floor((Date.now() - startedAt) / 1000);
+                    elapsedEl.textContent = formatElapsed(seconds);
+                    progressStatus.textContent = statusFor(seconds);
+                }, 1000);
+            }
+
+            function stopTimers() {
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+            }
+
+            function show(el) { el.hidden = false; }
+            function hide(el) { el.hidden = true; }
+
+            function setBusy(busy) {
+                generateBtn.disabled = busy;
+                promptEl.disabled = busy;
+                durationEl.disabled = busy;
+                generateBtn.textContent = busy ? 'Generating...' : 'Generate Original Track';
+            }
+
+            function resetToForm() {
+                stopTimers();
+                hide(progressEl);
+                hide(resultEl);
+                hide(errorEl);
+                setBusy(false);
+                audioEl.removeAttribute('src');
+            }
+
+            function showError(message) {
+                stopTimers();
+                hide(progressEl);
+                hide(resultEl);
+                errorMessage.textContent = message || 'Please try again.';
+                show(errorEl);
+                setBusy(false);
+            }
+
+            function showResult(result) {
+                stopTimers();
+                hide(progressEl);
+                hide(errorEl);
+
+                resultTitle.textContent = result.title || 'Your track is ready';
+                resultArtist.textContent = result.artistName || 'AI Artist';
+                resultGenre.textContent = result.genre || '';
+                resultPrice.textContent = result.suggestedPriceDisplay || '';
+                originalityEl.textContent = result.originalityStatement || '';
+
+                if (result.audioUrl) {
+                    audioEl.src = result.audioUrl;
+                    downloadLink.href = result.audioUrl;
+                    show(audioWrap);
+                    show(downloadLink);
+                    hide(audioMissing);
+                } else {
+                    hide(audioWrap);
+                    hide(downloadLink);
+                    show(audioMissing);
+                }
+
+                if (result.albumId) {
+                    viewStoreLink.href = '@Url.Action("Details", "Store")/' + result.albumId;
+                    show(viewStoreLink);
+                } else {
+                    hide(viewStoreLink);
+                }
+
+                show(resultEl);
+                setBusy(false);
+            }
+
+            function poll(jobId) {
+                fetch('@Url.Action("Status", "AiMusic")/' + encodeURIComponent(jobId), {
+                    headers: { 'Accept': 'application/json' }
+                }).then(function (response) {
+                    if (response.status === 404) {
+                        throw new Error('This generation could not be found. Please start a new one.');
+                    }
+                    if (!response.ok) {
+                        throw new Error('status ' + response.status);
+                    }
+                    pollFailures = 0;
+                    return response.json();
+                }).then(function (data) {
+                    if (data.status === 'succeeded' && data.result) {
+                        showResult(data.result);
+                    } else if (data.status === 'failed') {
+                        showError(data.error);
+                    }
+                    // pending / running -> keep polling
+                }).catch(function (err) {
+                    pollFailures++;
+                    if (pollFailures >= 5) {
+                        showError(err && err.message ? err.message : 'Lost connection while generating. Please try again.');
+                    }
+                });
+            }
+
+            function startGeneration() {
+                var prompt = promptEl.value.trim();
+                if (!prompt) {
+                    showError('Please describe the music you want to generate.');
+                    promptEl.focus();
+                    return;
+                }
+
+                hide(errorEl);
+                hide(resultEl);
+                show(progressEl);
+                progressStatus.textContent = 'Starting generation...';
+                elapsedEl.textContent = '0:00';
+                setBusy(true);
+                pollFailures = 0;
+
+                var token = form.querySelector('input[name="__RequestVerificationToken"]').value;
+                var body = new URLSearchParams();
+                body.append('prompt', prompt);
+                body.append('durationSeconds', durationEl.value);
+                body.append('__RequestVerificationToken', token);
+
+                fetch('@Url.Action("Start", "AiMusic")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                    body: body.toString()
+                }).then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data };
+                    });
+                }).then(function (payload) {
+                    if (!payload.ok || !payload.data.jobId) {
+                        showError(payload.data && payload.data.error ? payload.data.error : 'Could not start generation.');
+                        return;
+                    }
+                    startTicking();
+                    var jobId = payload.data.jobId;
+                    poll(jobId);
+                    pollTimer = setInterval(function () { poll(jobId); }, 3000);
+                }).catch(function () {
+                    showError('Could not reach the generation service. Please try again.');
+                });
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                startGeneration();
+            });
+
+            retryBtn.addEventListener('click', function () {
+                resetToForm();
+                promptEl.focus();
+            });
+
+            generateAnother.addEventListener('click', function () {
+                resetToForm();
+                promptEl.value = '';
+                updateCharCount();
+                promptEl.focus();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        })();
+    </script>
 }

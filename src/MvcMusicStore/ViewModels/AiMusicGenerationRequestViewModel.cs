@@ -1,34 +1,20 @@
-using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Mvc.Rendering;
-
 namespace MvcMusicStore.ViewModels
 {
+    public class AiMusicSamplePrompt
+    {
+        public required string Label { get; init; }
+
+        public required string Prompt { get; init; }
+    }
+
     public class AiMusicGenerationRequestViewModel
     {
-        [Required]
-        [Display(Name = "Genre")]
-        public int GenreId { get; set; }
+        public string? Prompt { get; set; }
 
-        [Required]
-        [Display(Name = "Style direction")]
-        public string? StyleDirection { get; set; }
+        public int DurationSeconds { get; set; } = 30;
 
-        [Required]
-        public string? Mood { get; set; }
+        public IReadOnlyList<int> DurationOptions { get; } = [15, 30, 45, 60];
 
-        [Required]
-        public string? Instrumentation { get; set; }
-
-        [Range(40, 220)]
-        [Display(Name = "Tempo (BPM)")]
-        public int TempoBpm { get; set; } = 120;
-
-        public IReadOnlyList<SelectListItem> Genres { get; set; } = [];
-
-        public IReadOnlyList<SelectListItem> StyleDirections { get; set; } = [];
-
-        public IReadOnlyList<SelectListItem> MoodOptions { get; set; } = [];
-
-        public IReadOnlyList<SelectListItem> InstrumentationOptions { get; set; } = [];
+        public IReadOnlyList<AiMusicSamplePrompt> SamplePrompts { get; init; } = [];
     }
 }
