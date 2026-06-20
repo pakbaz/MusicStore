@@ -149,6 +149,7 @@ namespace MvcMusicStore.Models
                 {
                     OrderDetailId = orderDetailId++,
                     AlbumId = item.AlbumId,
+                    AlbumTitle = item.AlbumTitle,
                     OrderId = order.OrderId,
                     UnitPrice = item.AlbumPrice,
                     Quantity = item.Count,
