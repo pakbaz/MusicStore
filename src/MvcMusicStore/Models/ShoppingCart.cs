@@ -222,6 +222,24 @@ namespace MvcMusicStore.Models
             var cartItems = await GetCartItemsAsync();
             order.OrderDetails ??= new List<OrderDetail>();
 
+            // Load the catalog albums backing the cart so each line can capture the album's
+            // current title, art, and audio (download) URL as a stable snapshot. Albums are
+            // fetched one id at a time, matching the Cosmos-safe query patterns used elsewhere.
+            var albumLookup = new Dictionary<int, Album>();
+            var albumIds = cartItems
+                .Where(i => !i.IsBundle)
+                .Select(i => i.AlbumId)
+                .Concat(cartItems.SelectMany(i => (i.BundleItems ?? new List<CartBundleItem>()).Select(m => m.AlbumId)))
+                .Distinct();
+            foreach (var albumId in albumIds)
+            {
+                var album = await _db.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
+                if (album != null)
+                {
+                    albumLookup[albumId] = album;
+                }
+            }
+
             var orderDetailId = 1;
 
             // Iterate over the items in the cart, adding the order details for each
@@ -233,6 +251,8 @@ namespace MvcMusicStore.Models
                     // (discounted) unit price, so the order total matches the discounted cart line.
                     foreach (var member in item.BundleItems ?? new List<CartBundleItem>())
                     {
+                        albumLookup.TryGetValue(member.AlbumId, out var memberAlbum);
+
                         order.OrderDetails.Add(new OrderDetail
                         {
                             OrderDetailId = orderDetailId++,
@@ -240,6 +260,9 @@ namespace MvcMusicStore.Models
                             OrderId = order.OrderId,
                             UnitPrice = member.UnitPrice,
                             Quantity = item.Count,
+                            AlbumTitle = memberAlbum?.Title ?? member.AlbumTitle,
+                            AlbumArtUrl = memberAlbum?.GetDisplayThumbnailUrl(),
+                            AudioUrl = memberAlbum?.AudioUrl,
                         });
 
                         orderTotal += member.UnitPrice * item.Count;
@@ -248,6 +271,8 @@ namespace MvcMusicStore.Models
                     continue;
                 }
 
+                albumLookup.TryGetValue(item.AlbumId, out var album);
+
                 var orderDetail = new OrderDetail
                 {
                     OrderDetailId = orderDetailId++,
@@ -255,6 +280,9 @@ namespace MvcMusicStore.Models
                     OrderId = order.OrderId,
                     UnitPrice = item.AlbumPrice,
                     Quantity = item.Count,
+                    AlbumTitle = album?.Title ?? item.AlbumTitle,
+                    AlbumArtUrl = album?.GetDisplayThumbnailUrl() ?? item.AlbumArtUrl,
+                    AudioUrl = album?.AudioUrl,
                 };
 
                 // Set the order total of the shopping cart
