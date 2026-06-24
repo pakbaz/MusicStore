@@ -46,6 +46,7 @@ namespace MvcMusicStore.Controllers
         {
             if (string.IsNullOrWhiteSpace(blobName))
             {
+                SetFailureCacheHeaders();
                 return NotFound();
             }
 
@@ -54,8 +55,6 @@ namespace MvcMusicStore.Controllers
 
             try
             {
-                Response.Headers.CacheControl = "public, max-age=86400";
-
                 // Range processing requires a seekable stream so the framework can serve byte ranges.
                 // This lets the preview player scrub, and is also required by Safari/iOS, which refuse
                 // to play <audio> without range support. OpenReadAsync returns a seekable stream that
@@ -68,6 +67,7 @@ namespace MvcMusicStore.Controllers
                         : properties.Value.ContentType;
 
                     var seekableStream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+                    SetSuccessCacheHeaders();
                     return File(seekableStream, rangeContentType, enableRangeProcessing: true);
                 }
 
@@ -76,17 +76,32 @@ namespace MvcMusicStore.Controllers
                     ? fallbackContentType
                     : download.Value.Details.ContentType;
 
+                SetSuccessCacheHeaders();
                 return File(download.Value.Content, contentType);
             }
             catch (RequestFailedException ex) when (ex.Status == 404)
             {
+                SetFailureCacheHeaders();
                 return NotFound();
             }
             catch (RequestFailedException ex)
             {
                 logger.LogWarning(ex, "Failed to stream blob {Blob} from container {Container}.", blobName, containerName);
+                SetFailureCacheHeaders();
                 return StatusCode(StatusCodes.Status502BadGateway);
             }
+        }
+
+        private void SetSuccessCacheHeaders()
+        {
+            Response.Headers.CacheControl = "public, max-age=86400";
+        }
+
+        private void SetFailureCacheHeaders()
+        {
+            Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers.Expires = "0";
         }
     }
 }
