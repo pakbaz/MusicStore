@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MvcMusicStore.Models;
 using MvcMusicStore.Services;
 using MvcMusicStore.ViewModels;
@@ -41,15 +42,18 @@ namespace MvcMusicStore.Controllers
 
         private readonly IServiceScopeFactory scopeFactory;
         private readonly IAiMusicJobStore jobStore;
+        private readonly MusicGenOptions musicGenOptions;
         private readonly ILogger<AiMusicController> logger;
 
         public AiMusicController(
             IServiceScopeFactory scopeFactory,
             IAiMusicJobStore jobStore,
+            IOptions<MusicGenOptions> musicGenOptionsAccessor,
             ILogger<AiMusicController> logger)
         {
             this.scopeFactory = scopeFactory;
             this.jobStore = jobStore;
+            musicGenOptions = musicGenOptionsAccessor.Value;
             this.logger = logger;
         }
 
@@ -58,6 +62,7 @@ namespace MvcMusicStore.Controllers
         {
             return View(new AiMusicGenerationRequestViewModel
             {
+                DurationSeconds = DefaultDurationSeconds,
                 SamplePrompts = SamplePromptLibrary
             });
         }
@@ -78,7 +83,7 @@ namespace MvcMusicStore.Controllers
                 return BadRequest(new { error = $"Please keep your description under {MaxPromptLength} characters." });
             }
 
-            int duration = Math.Clamp(durationSeconds <= 0 ? 30 : durationSeconds, MinDurationSeconds, MaxDurationSeconds);
+            int duration = Math.Clamp(durationSeconds <= 0 ? DefaultDurationSeconds : durationSeconds, MinDurationSeconds, MaxDurationSeconds);
 
             AiMusicJob job = jobStore.Create(prompt, duration);
             _ = Task.Run(() => RunGenerationAsync(job.Id));
@@ -230,5 +235,10 @@ namespace MvcMusicStore.Controllers
                 ?? genres.FirstOrDefault()
                 ?? throw new InvalidOperationException("No genres are configured in the catalog.");
         }
+
+        private int DefaultDurationSeconds => Math.Clamp(
+            musicGenOptions.DefaultDurationSeconds <= 0 ? 15 : musicGenOptions.DefaultDurationSeconds,
+            MinDurationSeconds,
+            MaxDurationSeconds);
     }
 }

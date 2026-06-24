@@ -9,7 +9,7 @@ public class MusicGenOptions
     /// </summary>
     public string? BaseUrl { get; set; }
 
-    public int DefaultDurationSeconds { get; set; } = 30;
+    public int DefaultDurationSeconds { get; set; } = 15;
 
     public int TimeoutSeconds { get; set; } = 600;
 }

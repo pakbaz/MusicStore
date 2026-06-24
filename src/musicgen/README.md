@@ -1,25 +1,32 @@
 # ACE-Step Music Generation Container
 
-Tiny FastAPI wrapper for ACE-Step 1.5 DiT-only text-to-music generation on CPU.
+FastAPI wrapper for ACE-Step 1.5 DiT-only text-to-music generation. It defaults to
+ACE-Step's 2B turbo model with 8 inference steps, `shift=3.0`, ODE/Euler sampling,
+and no LLM/ADG path for lower latency. `ACESTEP_DEVICE=auto` uses the best available
+device for the installed PyTorch runtime; the default Dockerfile installs CPU PyTorch.
 
 ## Build and run
 
 ```bash
 docker build -t musicgen-test src/musicgen
-docker run --rm -p 8000:8000 -v musicgen-models:/models musicgen-test
+docker run --rm -p 8000:8000 musicgen-test
 ```
 
-Model weights are not baked into the image. They download on the first `/generate` call into `/models`.
+The Docker build downloads the main ACE-Step 1.5 model into the image through ACE-Step's
+own downloader, so runtime generation loads local checkpoints instead of downloading on
+the first `/generate` request.
 
 ## Environment
 
 - `ACESTEP_CONFIG_PATH` default: `acestep-v15-turbo` (smallest 2B turbo DiT config found in ACE-Step 1.5)
-- `ACESTEP_DEVICE` default: `cpu`
+- `ACESTEP_DEVICE` default: `auto`
 - `ACESTEP_INIT_LLM=false` disables the 5Hz language model (pure DiT mode)
 - `ACESTEP_CHECKPOINTS_DIR` default: `/models/checkpoints`
 - `HF_HOME` default: `/models/huggingface`
 - `MUSICGEN_OUTPUT_DIR` default: `/models/outputs`
 - `ACESTEP_INFERENCE_STEPS` default: `8`
+- `ACESTEP_INFERENCE_SHIFT` default: `3.0` (recommended for turbo models)
+- `MUSICGEN_PRELOAD_MODEL` default: `true`
 
 ## HTTP contract
 
@@ -46,5 +53,5 @@ Example:
 ```bash
 curl -X POST http://localhost:8000/generate \
   -H 'content-type: application/json' \
-  -d '{"prompt":"short upbeat synthwave instrumental","durationSeconds":8,"format":"mp3"}'
+  -d '{"prompt":"short upbeat synthwave instrumental","durationSeconds":10,"format":"mp3"}'
 ```
