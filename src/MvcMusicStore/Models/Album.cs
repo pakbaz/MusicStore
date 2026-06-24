@@ -7,6 +7,9 @@ namespace MvcMusicStore.Models
 {
     public class Album {
         public const string DefaultPlaceholderThumbnailUrl = "~/Images/placeholder.svg";
+        private const string MediaThumbnailPathPrefix = "/media/thumbnails/";
+        private const string TildeMediaThumbnailPathPrefix = "~" + MediaThumbnailPathPrefix;
+        private const string MediaThumbnailCacheVersion = "20260624";
 
         public static bool IsPlaceholderThumbnailUrl(string? thumbnailUrl)
         {
@@ -28,9 +31,31 @@ namespace MvcMusicStore.Models
                 return DefaultPlaceholderThumbnailUrl;
             }
 
-            return thumbnailUrl.StartsWith("http://coverartarchive.org/", StringComparison.OrdinalIgnoreCase)
+            var normalized = thumbnailUrl.StartsWith("http://coverartarchive.org/", StringComparison.OrdinalIgnoreCase)
                 ? "https://coverartarchive.org/" + thumbnailUrl["http://coverartarchive.org/".Length..]
                 : thumbnailUrl;
+
+            return AddMediaThumbnailCacheVersion(normalized);
+        }
+
+        private static string AddMediaThumbnailCacheVersion(string thumbnailUrl)
+        {
+            if (!thumbnailUrl.StartsWith(MediaThumbnailPathPrefix, StringComparison.OrdinalIgnoreCase) &&
+                !thumbnailUrl.StartsWith(TildeMediaThumbnailPathPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return thumbnailUrl;
+            }
+
+            var queryStart = thumbnailUrl.IndexOf('?');
+            if (queryStart >= 0 && thumbnailUrl[(queryStart + 1)..]
+                    .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                    .Any(parameter => parameter.StartsWith("v=", StringComparison.OrdinalIgnoreCase)))
+            {
+                return thumbnailUrl;
+            }
+
+            var separator = queryStart >= 0 ? "&" : "?";
+            return $"{thumbnailUrl}{separator}v={MediaThumbnailCacheVersion}";
         }
 
         [ScaffoldColumn(false)]

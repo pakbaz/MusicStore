@@ -104,12 +104,12 @@ namespace MvcMusicStore.Controllers
                             Title = album.Title,
                             ArtistName = album.ArtistName,
                             GenreName = album.GenreName,
-                            Price = album.Price,
+                            Price = (decimal?)album.Price,
                             ReleaseDate = album.ReleaseDate,
-                            IsAvailable = album.IsAvailable,
-                            Popularity = album.Popularity,
+                            IsAvailable = (bool?)album.IsAvailable,
+                            Popularity = (int?)album.Popularity,
                             PreviewUrl = album.PreviewUrl,
-                            PreviewDurationSeconds = album.PreviewDurationSeconds,
+                            PreviewDurationSeconds = (int?)album.PreviewDurationSeconds,
                             UploadedThumbnailUrl = album.UploadedThumbnailUrl,
                             MetadataThumbnailUrl = album.MetadataThumbnailUrl,
                             AlbumArtUrl = album.AlbumArtUrl
@@ -144,12 +144,12 @@ namespace MvcMusicStore.Controllers
                             Title = album.Title,
                             ArtistName = album.ArtistName,
                             GenreName = album.GenreName,
-                            Price = album.Price,
+                            Price = (decimal?)album.Price,
                             ReleaseDate = album.ReleaseDate,
-                            IsAvailable = album.IsAvailable,
-                            Popularity = album.Popularity,
+                            IsAvailable = (bool?)album.IsAvailable,
+                            Popularity = (int?)album.Popularity,
                             PreviewUrl = album.PreviewUrl,
-                            PreviewDurationSeconds = album.PreviewDurationSeconds,
+                            PreviewDurationSeconds = (int?)album.PreviewDurationSeconds,
                             UploadedThumbnailUrl = album.UploadedThumbnailUrl,
                             MetadataThumbnailUrl = album.MetadataThumbnailUrl,
                             AlbumArtUrl = album.AlbumArtUrl
@@ -333,15 +333,15 @@ namespace MvcMusicStore.Controllers
                 Title = row.Title ?? string.Empty,
                 ArtistName = row.ArtistName ?? string.Empty,
                 GenreName = row.GenreName ?? string.Empty,
-                Price = row.Price,
-                EffectivePrice = row.Price,
+                Price = row.Price ?? 0m,
+                EffectivePrice = row.Price ?? 0m,
                 ReleaseDate = row.ReleaseDate,
-                IsAvailable = row.IsAvailable,
-                Popularity = row.Popularity,
+                IsAvailable = row.IsAvailable ?? true,
+                Popularity = row.Popularity ?? 0,
                 AverageRating = hasStats ? stats.AverageRating : 0d,
                 ReviewCount = hasStats ? stats.ReviewCount : 0,
                 PreviewUrl = row.PreviewUrl,
-                PreviewDurationSeconds = row.PreviewDurationSeconds,
+                PreviewDurationSeconds = row.PreviewDurationSeconds ?? Album.DefaultPreviewDurationSeconds,
                 AlbumArtUrl = new Album
                 {
                     UploadedThumbnailUrl = row.UploadedThumbnailUrl,
@@ -357,12 +357,12 @@ namespace MvcMusicStore.Controllers
             public string? Title { get; set; }
             public string? ArtistName { get; set; }
             public string? GenreName { get; set; }
-            public decimal Price { get; set; }
+            public decimal? Price { get; set; }
             public DateTime? ReleaseDate { get; set; }
-            public bool IsAvailable { get; set; }
-            public int Popularity { get; set; }
+            public bool? IsAvailable { get; set; }
+            public int? Popularity { get; set; }
             public string? PreviewUrl { get; set; }
-            public int PreviewDurationSeconds { get; set; }
+            public int? PreviewDurationSeconds { get; set; }
             public string? UploadedThumbnailUrl { get; set; }
             public string? MetadataThumbnailUrl { get; set; }
             public string? AlbumArtUrl { get; set; }
