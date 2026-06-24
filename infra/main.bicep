@@ -13,6 +13,7 @@ param adminPassword string = 'ChangeThis1!'
 param cosmosEnableFreeTier bool = false
 param musicgenCpu string = '3.5'
 param musicgenMemory string = '24Gi'
+param musicgenMinReplicas int = 1
 
 var resourceToken = uniqueString(subscription().id, environmentName, location)
 var resourceGroupName = 'rg-${environmentName}'
@@ -33,6 +34,7 @@ module resources 'resources.bicep' = {
     cosmosEnableFreeTier: cosmosEnableFreeTier
     musicgenCpu: musicgenCpu
     musicgenMemory: musicgenMemory
+    musicgenMinReplicas: musicgenMinReplicas
   }
 }
 

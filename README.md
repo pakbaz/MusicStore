@@ -259,7 +259,9 @@ docker build -t musicgen-test src/musicgen
 docker run --rm -p 8000:8000 musicgen-test
 ```
 
-Then start the web app in Development mode. The development configuration already uses `http://localhost:8000`.
+The image build downloads the ACE-Step model into the image, so the first `/generate`
+request does not need to fetch checkpoints. Then start the web app in Development mode.
+The development configuration already uses `http://localhost:8000`.
 
 ## Azure deployment
 
@@ -274,7 +276,7 @@ The `infra` folder provisions:
 - Log Analytics workspace.
 - Role assignments for ACR pull, Cosmos data contributor, and Storage Blob Data Contributor.
 
-The web container receives Cosmos endpoint, storage blob endpoint, container names, musicgen internal URL, managed identity client ID, and admin credentials through Container Apps environment variables and secrets. The web container also receives `Email__BaseUrl` (its own public URL) so email links resolve; enabling real email delivery is a separate manual step (set `Email__Provider=Acs` plus the ACS sender settings — see [Email and cart recovery](#email-and-cart-recovery)). The musicgen container is internal-only and is called by the web app inside the Container Apps environment.
+The web container receives Cosmos endpoint, storage blob endpoint, container names, musicgen internal URL, managed identity client ID, and admin credentials through Container Apps environment variables and secrets. The web container also receives `Email__BaseUrl` (its own public URL) so email links resolve; enabling real email delivery is a separate manual step (set `Email__Provider=Acs` plus the ACS sender settings — see [Email and cart recovery](#email-and-cart-recovery)). The musicgen container is internal-only, keeps one warm replica by default to avoid first-request model cold starts, and is called by the web app inside the Container Apps environment.
 
 For production payments, supply `Stripe:SecretKey` and `Stripe:WebhookSecret` as Container Apps secrets (or Key Vault references) rather than plain environment variables, and point the Stripe dashboard webhook at the deployed `/Checkout/Webhook` endpoint.
 

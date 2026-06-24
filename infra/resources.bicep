@@ -9,6 +9,7 @@ param adminPassword string
 param cosmosEnableFreeTier bool = false
 param musicgenCpu string = '3.5'
 param musicgenMemory string = '24Gi'
+param musicgenMinReplicas int = 1
 param musicgenWorkloadProfileType string = 'E4'
 param webImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param musicgenImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
@@ -232,15 +233,31 @@ resource musicgenContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             {
               name: 'ACESTEP_DEVICE'
-              value: 'cpu'
+              value: 'auto'
             }
             {
               name: 'ACESTEP_CONFIG_PATH'
               value: 'acestep-v15-turbo'
             }
             {
+              name: 'ACESTEP_INFERENCE_STEPS'
+              value: '8'
+            }
+            {
+              name: 'ACESTEP_INFERENCE_SHIFT'
+              value: '3.0'
+            }
+            {
+              name: 'MUSICGEN_PRELOAD_MODEL'
+              value: 'true'
+            }
+            {
+              name: 'MUSICGEN_CPU_THREADS'
+              value: '4'
+            }
+            {
               name: 'HF_HOME'
-              value: '/models'
+              value: '/models/huggingface'
             }
           ]
           resources: {
@@ -250,7 +267,7 @@ resource musicgenContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 0
+        minReplicas: musicgenMinReplicas
         maxReplicas: 1
       }
     }
