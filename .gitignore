@@ -38,3 +38,6 @@ Packages/
 *.db-wal
 src/MvcMusicStore/wwwroot/Images/MetadataCache/*
 !src/MvcMusicStore/wwwroot/Images/MetadataCache/.gitignore
+
+# azd local environment (subscription/env config)
+.azure/

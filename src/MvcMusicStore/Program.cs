@@ -11,6 +11,15 @@ using MvcMusicStore.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Defense-in-depth: a BackgroundService that throws an unhandled exception must never tear down
+// the whole web host. The .NET default (StopHost) turns a transient dependency failure — e.g. a
+// Cosmos 403/throttle — into a full crash loop and site outage. Ignore keeps the website serving
+// while the failing worker stops; workers also guard their own loops so they recover on their own.
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient<IAlbumArtworkService, MusicBrainzAlbumArtworkService>(client =>

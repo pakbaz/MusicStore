@@ -34,7 +34,20 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             currentOptions = options.Value;
-            await EnrichCatalogPassAsync(currentOptions, stoppingToken);
+            try
+            {
+                await EnrichCatalogPassAsync(currentOptions, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Never let a transient dependency failure (e.g. a Cosmos 403/throttle) escape the
+                // worker — that would crash the host. Log and retry on the next interval instead.
+                logger.LogError(ex, "Album metadata enrichment pass failed; will retry next interval.");
+            }
 
             var interval = TimeSpan.FromHours(Math.Max(1, currentOptions.IntervalHours));
             await DelaySafelyAsync(interval, stoppingToken);
@@ -185,6 +198,13 @@ public sealed class AlbumMetadataEnrichmentWorker : BackgroundService
             return;
         }
 
-        await Task.Delay(delay, cancellationToken);
+        try
+        {
+            await Task.Delay(delay, cancellationToken);
+        }
+        catch (TaskCanceledException)
+        {
+            // Shutdown requested.
+        }
     }
 }
