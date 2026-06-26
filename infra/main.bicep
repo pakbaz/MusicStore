@@ -15,6 +15,12 @@ param musicgenCpu string = '3.5'
 param musicgenMemory string = '24Gi'
 param musicgenMinReplicas int = 1
 
+@description('Container image for the web service. Defaults to the placeholder; azd/CI override with the built image.')
+param webImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+@description('Container image for the musicgen service. Defaults to the placeholder; azd/CI override with the built image.')
+param musicgenImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
 var resourceToken = uniqueString(subscription().id, environmentName, location)
 var resourceGroupName = 'rg-${environmentName}'
 
@@ -35,6 +41,8 @@ module resources 'resources.bicep' = {
     musicgenCpu: musicgenCpu
     musicgenMemory: musicgenMemory
     musicgenMinReplicas: musicgenMinReplicas
+    webImageName: webImageName
+    musicgenImageName: musicgenImageName
   }
 }
 
